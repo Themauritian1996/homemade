@@ -120,3 +120,19 @@ export async function publishMeal(input: PublishMealInput): Promise<{ id: string
   if (error) throw error;
   return { id: data as string };
 }
+
+/** Mes plats publiés proposables en échange (mode « échange » ou « les deux »). */
+export async function fetchMySwappableMeals(userId: string): Promise<Meal[]> {
+  if (DEMO_MODE) return demoMeals.filter((m) => m.mode !== 'sale').slice(0, 3);
+  const { data, error } = await requireSupabase()
+    .from('meals')
+    .select('id')
+    .eq('cooker_id', userId)
+    .eq('status', 'published')
+    .in('mode', ['swap', 'both'])
+    .order('created_at', { ascending: false })
+    .limit(10);
+  if (error) throw error;
+  const meals = await Promise.all((data ?? []).map((r: { id: string }) => fetchMeal(r.id)));
+  return meals.filter((m): m is Meal => m !== null);
+}

@@ -1,7 +1,7 @@
 /**
  * IA LOCALE (développement uniquement) — Qwen3-VL via Ollama sur le PC du développeur.
  *
- * L'app appelle `http://<ip-du-PC>:8081/local-ai/api/chat` : Metro relaie vers Ollama (voir metro.config.js).
+ * L'app appelle `http://<ip-du-PC>:8081/local-ai` : la route API src/app/local-ai+api.ts relaie vers Ollama.
  * Aucun secret, aucune donnée hors du réseau local. Même prompt, même schéma JSON et même nettoyage
  * que l'Edge Function Claude (source unique : supabase/functions/analyze-meal/prompt.ts).
  *
@@ -10,7 +10,7 @@
  */
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
-import { OUTPUT_SCHEMA, RawAnalysis, sanitize, SYSTEM_PROMPT } from '../../supabase/functions/analyze-meal/prompt';
+import { LOCAL_SYSTEM_PROMPT, OUTPUT_SCHEMA, RawAnalysis, sanitize } from '../../supabase/functions/analyze-meal/prompt';
 import { config } from '@/lib/config';
 import type { AiMealAnalysis } from '@/types';
 
@@ -30,7 +30,7 @@ export async function analyzeWithLocalModel(base64Jpeg: string): Promise<AiMealA
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 120_000);
   try {
-    const res = await fetch(`${origin}/local-ai/api/chat`, {
+    const res = await fetch(`${origin}/local-ai`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       signal: controller.signal,
@@ -39,16 +39,26 @@ export async function analyzeWithLocalModel(base64Jpeg: string): Promise<AiMealA
         stream: false,
         think: false,
         format: OUTPUT_SCHEMA, // sortie JSON contrainte par le même schéma que Claude
-        options: { temperature: 0 },
+        keep_alive: '30m',
+        options: { temperature: 0, num_predict: 900, num_ctx: 4096 },
         messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'system', content: LOCAL_SYSTEM_PROMPT },
           { role: 'user', content: 'Analyse ce plat pour pré-remplir son annonce. Réponds uniquement en JSON.', images: [base64Jpeg] },
         ],
       }),
     });
-    const payload = (await res.json()) as { message?: { content?: string }; error?: string };
-    if (!res.ok || !payload.message?.content) throw new Error(payload.error ?? `IA locale : HTTP ${res.status}`);
-    const raw = JSON.parse(payload.message.content) as RawAnalysis;
+    // Réponse en flux NDJSON (une ligne JSON par morceau) : on assemble le contenu.
+    const text = await res.text();
+    let content = '';
+    let error: string | undefined;
+    for (const line of text.split('\n')) {
+      if (!line.trim()) continue;
+      const chunk = JSON.parse(line) as { message?: { content?: string }; error?: string };
+      if (chunk.error) error = chunk.error;
+      content += chunk.message?.content ?? '';
+    }
+    if (!res.ok || error || !content) throw new Error(error ?? `IA locale : HTTP ${res.status}`);
+    const raw = JSON.parse(content) as RawAnalysis;
     return sanitize(raw, `${config.localAiModel}@local`) as AiMealAnalysis;
   } finally {
     clearTimeout(timer);

@@ -23,6 +23,8 @@ export interface PublicProfile {
   badges: string[];
   isVerified: boolean;
   memberSince: string;
+  /** Repas partagés (échanges + ventes complétés). */
+  mealsShared?: number;
 }
 
 export interface MealIngredient {

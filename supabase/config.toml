@@ -7,7 +7,7 @@ extra_search_path = ["public", "extensions"]
 max_rows = 200
 
 [db]
-major_version = 15
+major_version = 17
 
 [db.seed]
 enabled = true
@@ -28,7 +28,8 @@ minimum_password_length = 8
 
 [auth.email]
 enable_signup = true
-enable_confirmations = true
+# ⚠️ Phase de test : confirmation par courriel désactivée (SMTP gratuit limité). Remettre à true avant le lancement.
+enable_confirmations = false
 double_confirm_changes = true
 
 # Stripe appelle ce webhook sans JWT Supabase : la signature Stripe fait office d'authentification.

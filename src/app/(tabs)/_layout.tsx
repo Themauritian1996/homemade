@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import React from 'react';
 import { ColorValue, Platform, StyleSheet, View } from 'react-native';
+import { DEMO_MODE } from '@/lib/config';
 import { colors, fonts, shadow } from '@/theme';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -42,7 +43,7 @@ export default function TabsLayout() {
           tabBarLabelStyle: { fontFamily: fonts.semibold, fontSize: 11, color: colors.tomato },
         }}
       />
-      <Tabs.Screen name="inbox" options={{ title: 'Messages', tabBarIcon: icon('chatbubbles', 'chatbubbles-outline'), tabBarBadge: 1, tabBarBadgeStyle: { backgroundColor: colors.tomato } }} />
+      <Tabs.Screen name="inbox" options={{ title: 'Messages', tabBarIcon: icon('chatbubbles', 'chatbubbles-outline'), tabBarBadge: DEMO_MODE ? 1 : undefined, tabBarBadgeStyle: { backgroundColor: colors.tomato } }} />
       <Tabs.Screen name="profile" options={{ title: 'Profil', tabBarIcon: icon('person-circle', 'person-circle-outline') }} />
     </Tabs>
   );

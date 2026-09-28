@@ -45,3 +45,6 @@ yarn-error.*
 supabase/.env
 supabase/functions/.env
 supabase/.temp/
+
+# réglages locaux de l'assistant
+.claude/

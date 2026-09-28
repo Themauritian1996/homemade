@@ -1,15 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import React from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import React, { useCallback, useState } from 'react';
 import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar, Badge, Divider } from '@/components/ui';
 import { allergenById } from '@/data/allergens';
-import { demoProfile } from '@/data/mock';
 import { DEMO_MODE } from '@/lib/config';
 import { formatRating } from '@/lib/format';
 import { signOut } from '@/services/auth';
-import { startPayoutOnboarding } from '@/services/profile';
+import { fetchMyProfile, startPayoutOnboarding } from '@/services/profile';
+import type { PublicProfile } from '@/types';
 import { useApp } from '@/store/app';
 import { colors, fonts, radius, shadow, spacing, type } from '@/theme';
 
@@ -19,7 +19,23 @@ export default function Profile() {
   const insets = useSafeAreaInsets();
   const { user, health } = useApp();
   // En production : chargé via `profiles` (agrégats de notes maintenus par trigger).
-  const p = { ...demoProfile, displayName: user?.displayName ?? demoProfile.displayName };
+  const [profile, setProfile] = useState<PublicProfile | null>(null);
+  useFocusEffect(
+    useCallback(() => {
+      if (user) fetchMyProfile(user.id).then(setProfile).catch(() => {});
+    }, [user]),
+  );
+  const p: PublicProfile = profile ?? {
+    id: user?.id ?? '',
+    displayName: user?.displayName ?? 'Moi',
+    cookerRating: null,
+    cookerRatingCount: 0,
+    eaterRating: null,
+    eaterRatingCount: 0,
+    badges: [],
+    isVerified: false,
+    memberSince: new Date().toISOString(),
+  };
 
   const openPayouts = async () => {
     try {
@@ -38,7 +54,7 @@ export default function Profile() {
         <View style={{ flex: 1, gap: 4 }}>
           <Text style={type.h2}>{p.displayName}</Text>
           <Text style={type.caption}>
-            {p.neighborhood} · membre depuis {new Date(p.memberSince).getFullYear()}
+            {p.neighborhood ? `${p.neighborhood} · ` : ''}membre depuis {new Date(p.memberSince).getFullYear()}
           </Text>
           <View style={{ flexDirection: 'row', gap: spacing.xs, flexWrap: 'wrap' }}>
             {p.badges.map((b) => (
@@ -54,7 +70,7 @@ export default function Profile() {
         <View style={styles.statDivider} />
         <Stat label="Note Eater" value={formatRating(p.eaterRating)} sub={`${p.eaterRatingCount} avis`} icon="happy" />
         <View style={styles.statDivider} />
-        <Stat label="Repas sauvés" value="43" sub="≈ 18 kg" icon="leaf" />
+        <Stat label="Repas sauvés" value={String(p.mealsShared ?? 0)} sub="portions partagées" icon="leaf" />
       </View>
 
       <View style={styles.card}>

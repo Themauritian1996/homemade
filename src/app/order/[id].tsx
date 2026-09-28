@@ -11,10 +11,10 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MealCard } from '@/components/MealCard';
 import { Button, Divider, IconButton } from '@/components/ui';
-import { meals as demoMeals } from '@/data/mock';
 import { config, DEMO_MODE } from '@/lib/config';
 import { formatPrice } from '@/lib/format';
-import { fetchMeal } from '@/services/meals';
+import { fetchMeal, fetchMySwappableMeals } from '@/services/meals';
+import { useApp } from '@/store/app';
 import { createPurchase, proposeSwap } from '@/services/orders';
 import { colors, fonts, radius, spacing, type } from '@/theme';
 import type { Meal } from '@/types';
@@ -27,15 +27,16 @@ export default function OrderModal() {
   const [qty, setQty] = useState(1);
   const [offered, setOffered] = useState<string | null>(null);
   const [note, setNote] = useState('');
+  const userId = useApp((st) => st.user?.id);
+  const [myMeals, setMyMeals] = useState<Meal[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     fetchMeal(id).then(setMeal);
-  }, [id]);
+    if (kind === 'swap' && userId) fetchMySwappableMeals(userId).then((l) => setMyMeals(l.filter((m) => m.id !== id))).catch(() => {});
+  }, [id, kind, userId]);
 
   if (!meal) return null;
-  // Démo : les plats « à moi » proposables à l'échange. En prod : mes plats publiés (mode swap/both).
-  const myMeals = demoMeals.filter((m) => m.id !== meal.id && m.mode !== 'sale').slice(0, 3);
   const subtotal = (meal.priceCents ?? 0) * qty;
   const serviceFee = Math.round(subtotal * 0.05);
 
@@ -131,6 +132,11 @@ export default function OrderModal() {
           <>
             <Text style={type.h3}>Quel plat proposez-vous ?</Text>
             <View style={{ gap: spacing.md }}>
+              {myMeals.length === 0 && (
+                <Text style={type.body}>
+                  Vous n'avez aucun plat publié en mode « Échange ». Publiez d'abord un plat (onglet Publier, mode Échange ou Les deux), puis revenez ici.
+                </Text>
+              )}
               {myMeals.map((m) => (
                 <Pressable key={m.id} onPress={() => setOffered(m.id)} style={[styles.offer, offered === m.id && { borderColor: colors.forest, backgroundColor: colors.sage }]}>
                   <View style={{ flex: 1, pointerEvents: 'none' }}>

@@ -348,6 +348,7 @@ export const demoProfile: PublicProfile = {
   badges: ['Eater fiable'],
   isVerified: true,
   memberSince: '2026-01-15',
+  mealsShared: 43,
 };
 
 /** Résultat IA simulé pour le mode démo. */

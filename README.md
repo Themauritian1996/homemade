@@ -11,6 +11,9 @@ Application mobile *peer-to-peer* d'échange et de vente de repas faits maison �
 | ⭐ **Réputation bidirectionnelle** | Cookers **et** Eaters sont notés ; avis en double-aveugle. |
 | 💬 **Chat & transactions** | Paiement Stripe pré-autorisé puis capturé à la cueillette ; échanges par accord mutuel. |
 
+## Tester (le plus simple)
+Double-cliquez sur **`Lancer-Homemade.bat`**, puis scannez le QR code avec **Expo Go**. Guide complet : [docs/07-tester.md](docs/07-tester.md).
+
 ## Démarrage rapide (mode démo, sans compte)
 ```bash
 npm install
@@ -33,6 +36,7 @@ Pour activer les vrais comptes, l'IA et les paiements : **[docs/06-setup.md](doc
 4. [Plan d'implémentation par phases](docs/04-roadmap.md) — jalons, critères de sortie, risques
 5. [Lignes maîtresses](docs/05-lignes-maitresses.md) — règles non négociables, paramètres macro, principes
 6. [Mise en route](docs/06-setup.md) — comptes Supabase / Anthropic / Stripe, déploiement
+7. **[Tester l'app, pas à pas](docs/07-tester.md)** — double-clic sur `Lancer-Homemade.bat`, scénario complet
 
 ## Scripts
 | Commande | Rôle |

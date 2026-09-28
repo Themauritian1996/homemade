@@ -3,6 +3,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import { FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { OrderActions } from '@/components/OrderActions';
 import { Avatar, IconButton } from '@/components/ui';
 import { DEMO_USER_ID } from '@/data/mock';
 import { fetchConversations, fetchMessages, markConversationRead, sendMessage, subscribeToConversation } from '@/services/chat';
@@ -49,15 +50,7 @@ export default function Chat() {
         </View>
       </View>
 
-      {conv?.orderId && (
-        <View style={styles.orderBar}>
-          <Ionicons name="bag-check-outline" size={18} color={colors.forest} />
-          <Text style={[type.caption, { flex: 1, color: colors.forest, fontFamily: fonts.semibold }]}>Commande confirmée · cueillette à coordonner</Text>
-          <Pressable onPress={() => router.push({ pathname: '/review/[orderId]', params: { orderId: conv.orderId! } })}>
-            <Text style={{ fontFamily: fonts.semibold, color: colors.tomato, fontSize: 13 }}>J'ai récupéré</Text>
-          </Pressable>
-        </View>
-      )}
+      {conv?.orderId && <OrderActions orderId={conv.orderId} me={me} refreshKey={messages.length} />}
 
       <FlatList
         ref={listRef}
@@ -104,7 +97,6 @@ export default function Chat() {
 
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingBottom: spacing.md, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border },
-  orderBar: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.sage, paddingHorizontal: spacing.lg, paddingVertical: spacing.md },
   system: { alignSelf: 'center', backgroundColor: colors.surfaceAlt, paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: radius.pill, marginVertical: spacing.sm },
   bubble: { maxWidth: '80%', paddingHorizontal: spacing.md, paddingVertical: 10, borderRadius: 18, gap: 2 },
   mine: { alignSelf: 'flex-end', backgroundColor: colors.forest, borderBottomRightRadius: 4 },

@@ -34,7 +34,8 @@ Le document à relire avant chaque décision produit ou technique. Si une demand
 | Fenêtre pour laisser un avis | 14 jours | `submit_review` |
 | Seuil IA « à vérifier » | confiance < 0,6 | `LOW_CONFIDENCE` (publish.tsx) |
 | Quota IA | 20 analyses / h / utilisateur | `AI_MAX_PER_HOUR` |
-| Modèle IA / effort | `claude-opus-5` / `medium` | `AI_MODEL`, `AI_EFFORT` |
+| Modèle IA / effort (production) | `claude-opus-5` / `medium` | `AI_MODEL`, `AI_EFFORT` |
+| Modèle IA local (développement, gratuit) | `qwen3-vl:4b-instruct` via Ollama | `EXPO_PUBLIC_AI_PROVIDER=local`, `EXPO_PUBLIC_LOCAL_AI_MODEL` |
 | Photo envoyée à l'IA | 1280 px, JPEG 70 % | `preparePhoto()` |
 | Objectif rappel allergènes IA | ≥ 98 % | jeu d'évaluation (docs/03) |
 | Objectif latence analyse | p95 < 8 s | idem |

@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AllergenPicker } from '@/components/AllergenPicker';
 import { Badge, Button, Chip, TextField } from '@/components/ui';
 import { ALLERGENS, AllergenCode, CUISINES, CuisineCode, DIETS, DietCode, allergenById } from '@/data/allergens';
+import { config } from '@/lib/config';
 import { declaredAllergens, validateMealDraft } from '@/lib/mealValidation';
 import { expandAllergens } from '@/lib/safety';
 import { analyzeMealPhoto, preparePhoto, PreparedPhoto } from '@/services/ai';
@@ -181,7 +182,8 @@ function ReviewStep({
   });
   const [mayContain, setMayContain] = useState<AllergenCode[]>([]);
   const [diets, setDiets] = useState<DietCode[]>(analysis?.diets ?? []);
-  const [mode, setMode] = useState<MealMode>('sale');
+  // Sans Stripe configuré, la vente est impossible côté serveur : on propose l'échange par défaut.
+  const [mode, setMode] = useState<MealMode>(config.stripePublishableKey ? 'sale' : 'swap');
   const [price, setPrice] = useState('12');
   const [portions, setPortions] = useState(3);
   const [hours, setHours] = useState(24);

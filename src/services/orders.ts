@@ -44,13 +44,42 @@ export async function proposeSwap(mealId: string, offeredMealId: string, message
   return { orderId: row.order_id, conversationId: row.conversation_id };
 }
 
+export type OrderAction = 'accepted' | 'declined' | 'ready' | 'picked_up' | 'cancelled';
+
+export interface OrderSummary {
+  id: string;
+  kind: 'purchase' | 'swap';
+  status: string;
+  cookerId: string;
+  eaterId: string;
+}
+
+/** Commande liée à une conversation (lecture autorisée aux deux parties par la RLS). */
+export async function fetchOrder(orderId: string): Promise<OrderSummary | null> {
+  if (DEMO_MODE) return { id: orderId, kind: 'purchase', status: 'accepted', cookerId: 'cook-sofia', eaterId: 'demo-user' };
+  const { data, error } = await requireSupabase()
+    .from('orders')
+    .select('id, kind, status, cookerId:cooker_id, eaterId:eater_id')
+    .eq('id', orderId)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as unknown as OrderSummary) ?? null;
+}
+
 /**
- * Transitions d'état via l'Edge Function `order-action` : elle valide la transition (RPC `transition_order`,
- * exécutée avec le JWT de l'utilisateur) puis applique l'effet Stripe (capture à `picked_up`, annulation sinon).
+ * Transitions d'état. Échange : RPC `transition_order` directe (rôle et état vérifiés en SQL, aucun paiement).
+ * Achat : Edge Function `order-action`, qui valide la même transition puis applique l'effet Stripe
+ * (capture à `picked_up`, annulation de la pré-autorisation sinon).
  */
-export async function transitionOrder(orderId: string, to: 'accepted' | 'declined' | 'ready' | 'picked_up' | 'cancelled', reason?: string) {
+export async function transitionOrder(orderId: string, to: OrderAction, kind: 'purchase' | 'swap', reason?: string) {
   if (DEMO_MODE) return;
-  const { error } = await requireSupabase().functions.invoke('order-action', { body: { order_id: orderId, to, reason } });
+  const sb = requireSupabase();
+  if (kind === 'swap') {
+    const { error } = await sb.rpc('transition_order', { p_order_id: orderId, p_to: to, p_reason: reason ?? null });
+    if (error) throw error;
+    return;
+  }
+  const { error } = await sb.functions.invoke('order-action', { body: { order_id: orderId, to, reason } });
   if (error) throw error;
 }
 
