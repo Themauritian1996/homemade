@@ -7,6 +7,9 @@ export const config = {
   supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL ?? '',
   supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '',
   stripePublishableKey: process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '',
+  /** `local` = Qwen3-VL via Ollama sur le PC (développement uniquement) ; `server` = Edge Function (Claude). */
+  aiProvider: (process.env.EXPO_PUBLIC_AI_PROVIDER ?? 'server') as 'local' | 'server',
+  localAiModel: process.env.EXPO_PUBLIC_LOCAL_AI_MODEL ?? 'qwen3-vl:4b-instruct',
   /** Commission plateforme appliquée aux ventes (affichage ; le calcul fait foi côté serveur). */
   platformFeeRate: 0.12,
   defaultRegion: { latitude: 45.5231, longitude: -73.5817, latitudeDelta: 0.06, longitudeDelta: 0.06 }, // Plateau, Montréal

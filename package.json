@@ -49,7 +49,8 @@
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "lint": "expo lint",
-    "test:db": "node supabase/tests/db.test.mjs"
+    "test:db": "node supabase/tests/db.test.mjs",
+    "test:ai": "node scripts/test-local-ai.mjs"
   },
   "private": true
 }
