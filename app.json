@@ -1,0 +1,74 @@
+{
+  "expo": {
+    "name": "Homemade",
+    "slug": "homemade",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "app.homemade.mobile",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Homemade utilise la caméra pour photographier vos plats et pré-remplir l'annonce.",
+        "NSLocationWhenInUseUsageDescription": "Homemade utilise votre position pour afficher les repas près de chez vous.",
+        "NSPhotoLibraryUsageDescription": "Homemade accède à vos photos pour publier un plat."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#FAF6EF",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "app.homemade.mobile",
+      "permissions": [
+        "CAMERA",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#FAF6EF",
+          "image": "./assets/icon.png",
+          "imageWidth": 160
+        }
+      ],
+      "expo-image",
+      "expo-localization",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Homemade utilise votre position pour afficher les repas près de chez vous."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Homemade utilise la caméra pour photographier vos plats."
+        }
+      ],
+      [
+        "@stripe/stripe-react-native",
+        {
+          "merchantIdentifier": "merchant.app.homemade",
+          "enableGooglePay": true
+        }
+      ]
+    ],
+    "scheme": "homemade",
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
