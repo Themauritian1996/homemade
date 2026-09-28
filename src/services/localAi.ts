@@ -10,7 +10,7 @@
  */
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
-import { LOCAL_SYSTEM_PROMPT, OUTPUT_SCHEMA, RawAnalysis, sanitize } from '../../supabase/functions/analyze-meal/prompt';
+import { LOCAL_OUTPUT_SCHEMA, LOCAL_SYSTEM_PROMPT, RawAnalysis, sanitize } from '../../supabase/functions/analyze-meal/prompt';
 import { config } from '@/lib/config';
 import type { AiMealAnalysis } from '@/types';
 
@@ -38,7 +38,7 @@ export async function analyzeWithLocalModel(base64Jpeg: string): Promise<AiMealA
         model: config.localAiModel,
         stream: false,
         think: false,
-        format: OUTPUT_SCHEMA, // sortie JSON contrainte par le même schéma que Claude
+        format: LOCAL_OUTPUT_SCHEMA, // même structure que Claude, avec des tailles bornées pour les petits modèles
         keep_alive: '30m',
         options: { temperature: 0, num_predict: 900, num_ctx: 4096 },
         messages: [

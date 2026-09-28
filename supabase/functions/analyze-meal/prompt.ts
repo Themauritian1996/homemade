@@ -94,6 +94,30 @@ export const OUTPUT_SCHEMA = {
   },
 } as const;
 
+/**
+ * Schéma pour les modèles LOCAUX : bornes de taille (maxItems / maxLength) que la grammaire d'Ollama
+ * applique pendant la génération. Évite qu'un petit modèle boucle en répétant les mêmes ingrédients.
+ * (Non utilisé pour Claude : le schéma OUTPUT_SCHEMA ci-dessus reste le contrat de production.)
+ */
+export const LOCAL_OUTPUT_SCHEMA = {
+  ...OUTPUT_SCHEMA,
+  properties: {
+    ...OUTPUT_SCHEMA.properties,
+    title: { type: 'string', maxLength: 70 },
+    description: { type: 'string', maxLength: 180 },
+    ingredients: { ...OUTPUT_SCHEMA.properties.ingredients, minItems: 1, maxItems: 8,
+      items: { ...OUTPUT_SCHEMA.properties.ingredients.items,
+        properties: { ...OUTPUT_SCHEMA.properties.ingredients.items.properties,
+          name: { type: 'string', maxLength: 40 },
+          allergens: { ...OUTPUT_SCHEMA.properties.ingredients.items.properties.allergens, maxItems: 4 } } } },
+    allergens: { ...OUTPUT_SCHEMA.properties.allergens, maxItems: 8,
+      items: { ...OUTPUT_SCHEMA.properties.allergens.items,
+        properties: { ...OUTPUT_SCHEMA.properties.allergens.items.properties, reason: { type: 'string', maxLength: 80 } } } },
+    diets: { ...OUTPUT_SCHEMA.properties.diets, maxItems: 3 },
+    warnings: { type: 'array', maxItems: 2, items: { type: 'string', maxLength: 120 } },
+  },
+};
+
 type Allergen = (typeof ALLERGEN_CODES)[number];
 
 export interface RawAnalysis {

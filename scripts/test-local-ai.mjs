@@ -1,9 +1,9 @@
 // Teste l'IA locale (Ollama) avec le même prompt/schéma/nettoyage que l'app.
 // Usage : npm run test:ai [chemin-ou-url-image]
 import fs from 'node:fs';
-import { LOCAL_SYSTEM_PROMPT, OUTPUT_SCHEMA, sanitize } from '../supabase/functions/analyze-meal/prompt.ts';
+import { LOCAL_OUTPUT_SCHEMA, LOCAL_SYSTEM_PROMPT, sanitize } from '../supabase/functions/analyze-meal/prompt.ts';
 
-const MODEL = process.env.LOCAL_AI_MODEL ?? 'qwen3-vl:4b-instruct';
+const MODEL = process.env.LOCAL_AI_MODEL ?? 'qwen3-vl:2b-instruct';
 const OLLAMA = process.env.OLLAMA_URL ?? 'http://127.0.0.1:11434';
 const src = process.argv[2] ?? 'https://images.unsplash.com/photo-1585937421612-70a008356fbe?w=1280&q=70&auto=format&fit=crop';
 
@@ -18,7 +18,7 @@ const res = await fetch(`${OLLAMA}/api/chat`, {
     model: MODEL,
     stream: false,
     think: false,
-    format: OUTPUT_SCHEMA,
+    format: LOCAL_OUTPUT_SCHEMA,
     keep_alive: '30m',
         options: { temperature: 0, num_predict: 900, num_ctx: 4096 },
     messages: [
