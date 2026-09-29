@@ -12,7 +12,9 @@ Application mobile *peer-to-peer* d'échange et de vente de repas faits maison �
 | 💬 **Chat & transactions** | Paiement Stripe pré-autorisé puis capturé à la cueillette ; échanges par accord mutuel. |
 
 ## Tester (le plus simple)
-Double-cliquez sur **`Lancer-Homemade.bat`**, puis scannez le QR code avec **Expo Go**.
+📦 **APK Android prêt à installer** (fabriqué automatiquement par GitHub Actions) : [Releases → dernière version](https://github.com/Themauritian1996/homemade/releases/latest).
+
+Ou, avec l'IA locale : Double-cliquez sur **`Lancer-Homemade.bat`**, puis scannez le QR code avec **Expo Go**.
 👉 **Guide d'utilisation complet (sans code) : [GUIDE-UTILISATION.md](GUIDE-UTILISATION.md)**
 
 ## Démarrage rapide (mode démo, sans compte)

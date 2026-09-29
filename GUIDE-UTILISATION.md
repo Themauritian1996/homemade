@@ -2,11 +2,55 @@
 
 **Pour tester l'app sur ton téléphone Android, sans savoir coder.**
 
-Tout est déjà installé et configuré sur ton PC : l'app, la base de données en ligne (Supabase) et l'intelligence artificielle gratuite qui analyse les photos (Qwen, sur ta carte graphique RTX 3050).
+Tout est déjà installé et configuré : l'app, la base de données en ligne (Supabase) et l'intelligence artificielle gratuite qui analyse les photos (Qwen, sur ta carte graphique RTX 3050).
+
+## Deux façons de tester
+
+| | **Méthode A — APK (recommandée)** | **Méthode B — Expo Go + PC** |
+|---|---|---|
+| Principe | L'app est **installée** sur le téléphone, comme une vraie app | Le téléphone affiche l'app pendant que le PC la fait tourner |
+| PC allumé ? | **Non** | Oui, avec la fenêtre noire ouverte |
+| Même Wi-Fi ? | **Non** (4G ou Wi-Fi) | Oui |
+| IA qui remplit l'annonce | Non : tu remplis l'annonce à la main | **Oui** (Qwen sur ta RTX, environ 15 s) |
+| Carte | Liste des plats par distance | Carte interactive Google |
+| Mise à jour | Automatique sur GitHub, à réinstaller | Instantanée |
 
 ---
 
-## Partie 1 — Préparer ton téléphone (une seule fois)
+## Méthode A — Installer l'APK depuis GitHub
+
+GitHub fabrique l'APK tout seul, dans le cloud, à chaque mise à jour du code. Compte 15 à 25 minutes après la mise à jour.
+
+### A1. Télécharger l'APK sur le téléphone
+1. Sur ton téléphone Android, ouvre **Chrome**.
+2. Va sur : **https://github.com/Themauritian1996/homemade/releases/latest**
+3. Le dépôt est **privé** : connecte-toi à GitHub avec ton compte (**Themauritian1996**) si c'est demandé.
+4. Dans la section **Assets**, touche le fichier **`Homemade-test-XX.apk`** pour le télécharger (environ 60 à 90 Mo).
+
+### A2. Installer l'APK
+1. Quand le téléchargement est fini, touche la notification **« Téléchargement terminé »**, ou ouvre l'app **Fichiers** puis **Téléchargements**.
+2. Touche le fichier `Homemade-test-XX.apk`.
+3. Android affiche **« Pour votre sécurité, votre téléphone n'est pas autorisé à installer des applis inconnues de cette source »** : touche **Paramètres**, active **« Autoriser cette source »**, puis reviens en arrière.
+4. Touche **Installer**. Si **Google Play Protect** affiche un avertissement (« App non vérifiée »), touche **Plus de détails**, puis **Installer quand même**. C'est normal pour une app de test qui ne vient pas du Play Store.
+5. Touche **Ouvrir** : l'app **Homemade** apparaît aussi parmi tes applications.
+
+### A3. Mettre à jour
+Quand je modifie l'app, une nouvelle version apparaît au même lien (**releases/latest**), avec un numéro plus grand. Télécharge-la et installe-la **par-dessus** : tes comptes et tes données sont conservés, car ils sont sur Supabase.
+
+### A4. Si l'installation échoue
+| Message | Que faire |
+|---|---|
+| « Application non installée » ou « conflit avec un paquet existant » | Désinstalle l'ancienne version de Homemade (appui long sur l'icône → Désinstaller), puis réinstalle. |
+| La page GitHub affiche « 404 » | Tu n'es pas connecté à GitHub dans Chrome, ou la première construction n'est pas terminée. |
+| « Analyse indisponible » | Normal avec l'APK : il n'a pas d'IA. Remplis l'annonce à la main. |
+
+➡️ Continue ensuite à la **Partie 3 — Utiliser l'app**.
+
+---
+
+## Méthode B — Expo Go + PC (avec l'IA sur ta carte graphique)
+
+### B1. Préparer ton téléphone (une seule fois)
 
 1. Sur ton téléphone Android, ouvre le **Play Store**.
 2. Cherche **Expo Go** et installe l'app (gratuite, éditeur : *Expo Project*).
@@ -14,7 +58,7 @@ Tout est déjà installé et configuré sur ton PC : l'app, la base de données 
 
 ---
 
-## Partie 2 — Lancer l'app (à chaque fois)
+### B2. Lancer l'app (à chaque fois)
 
 1. Vérifie que ton **PC et ton téléphone sont sur le même Wi-Fi**.
 2. Sur le PC, ouvre l'**Explorateur de fichiers** et va dans : `C:\Users\Cahya\Projects\homemade`
@@ -48,6 +92,8 @@ Tout est déjà installé et configuré sur ton PC : l'app, la base de données 
 | 👤 **Profil** | Tes notes (en tant que Cooker et en tant qu'Eater), ton profil santé, la déconnexion. |
 
 ### Publier un plat avec l'IA
+> Avec l'**APK** (méthode A), l'étape 3 est sautée : le formulaire s'ouvre vide et tu remplis toi-même le titre, les ingrédients et les allergènes.
+
 1. Onglet **Publier** → **Photographier mon plat** (ou **Choisir dans la galerie**).
 2. Recadre la photo, puis valide.
 3. **Analyse en cours** : environ **15 secondes**. L'IA tourne sur ton PC, gratuitement.
