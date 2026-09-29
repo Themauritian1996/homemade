@@ -16,7 +16,7 @@ import { ALLERGENS, AllergenCode, CUISINES, CuisineCode, DIETS, DietCode, allerg
 import { config } from '@/lib/config';
 import { declaredAllergens, validateMealDraft } from '@/lib/mealValidation';
 import { expandAllergens } from '@/lib/safety';
-import { analyzeMealPhoto, preparePhoto, PreparedPhoto } from '@/services/ai';
+import { aiEnabled, analyzeMealPhoto, preparePhoto, PreparedPhoto, uploadMealPhoto } from '@/services/ai';
 import { publishMeal } from '@/services/meals';
 import { useApp } from '@/store/app';
 import { colors, fonts, radius, shadow, spacing, type } from '@/theme';
@@ -41,21 +41,36 @@ export default function Publish() {
     const opts: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], quality: 0.9, allowsEditing: true, aspect: [4, 3] };
     const res = source === 'camera' ? await ImagePicker.launchCameraAsync(opts) : await ImagePicker.launchImageLibraryAsync(opts);
     if (res.canceled || !res.assets[0]) return;
+    let prepared: PreparedPhoto;
+    let path: string | null = null;
     try {
-      const prepared = await preparePhoto(res.assets[0].uri);
+      prepared = await preparePhoto(res.assets[0].uri);
       setPhoto(prepared);
       setStep('analyzing');
-      const out = await analyzeMealPhoto(prepared, user?.id ?? 'anon');
-      if (!out.analysis.isFood) {
+      // La photo est enregistrée avant (et indépendamment de) l'IA : elle n'est jamais perdue.
+      path = await uploadMealPhoto(prepared, user?.id ?? 'anon');
+      setPhotoPath(path);
+    } catch (e) {
+      Alert.alert('Photo non enregistrée', e instanceof Error ? e.message : 'Vérifiez votre connexion et réessayez.');
+      setStep('capture');
+      return;
+    }
+    if (!aiEnabled()) {
+      setAnalysis(null);
+      setStep('review');
+      return;
+    }
+    try {
+      const out = await analyzeMealPhoto(prepared, path);
+      if (out.analysis && !out.analysis.isFood) {
         Alert.alert('Hmm…', 'Nous ne reconnaissons pas de plat sur cette photo. Essayez avec une photo plus nette, vue de dessus.');
         setStep('capture');
         return;
       }
       setAnalysis(out.analysis);
-      setPhotoPath(out.photoPath);
       setAnalysisId(out.aiAnalysisId);
       setStep('review');
-    } catch (e) {
+    } catch {
       // L'IA est une aide, jamais un point de blocage : on bascule en saisie manuelle.
       Alert.alert('Analyse indisponible', 'Vous pouvez remplir l’annonce manuellement.');
       setAnalysis(null);
@@ -85,7 +100,11 @@ function CaptureStep({ onPick }: { onPick: (s: 'camera' | 'library') => void }) 
       <View style={{ gap: spacing.sm }}>
         <Text style={type.label}>Espace Cooker</Text>
         <Text style={type.h1}>Partagez votre plat</Text>
-        <Text style={type.body}>Prenez une photo : notre IA prépare l'annonce pour vous — type de plat, ingrédients et allergènes. Vous vérifiez, vous publiez.</Text>
+        <Text style={type.body}>
+          {aiEnabled()
+            ? "Prenez une photo : notre IA prépare l'annonce pour vous — type de plat, ingrédients et allergènes. Vous vérifiez, vous publiez."
+            : 'Prenez une photo, décrivez les ingrédients et déclarez les allergènes. Vos voisins allergiques seront protégés automatiquement.'}
+        </Text>
       </View>
 
       <Pressable onPress={() => onPick('camera')} style={({ pressed }) => [styles.captureCard, pressed && { opacity: 0.92 }]}>
@@ -96,7 +115,9 @@ function CaptureStep({ onPick }: { onPick: (s: 'camera' | 'library') => void }) 
         <Text style={[type.h2, { color: colors.onDark }]}>Photographier mon plat</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <Ionicons name="sparkles" size={14} color={colors.saffron} />
-          <Text style={{ fontFamily: fonts.medium, color: 'rgba(255,255,255,0.85)' }}>Annonce pré-remplie par l'IA en ~5 secondes</Text>
+          <Text style={{ fontFamily: fonts.medium, color: 'rgba(255,255,255,0.85)' }}>
+            {aiEnabled() ? "Annonce pré-remplie par l'IA en quelques secondes" : 'Annonce prête en une minute'}
+          </Text>
         </View>
       </Pressable>
 

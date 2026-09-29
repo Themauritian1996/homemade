@@ -7,8 +7,8 @@ export const config = {
   supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL ?? '',
   supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '',
   stripePublishableKey: process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '',
-  /** `local` = Qwen3-VL via Ollama sur le PC (développement uniquement) ; `server` = Edge Function (Claude). */
-  aiProvider: (process.env.EXPO_PUBLIC_AI_PROVIDER ?? 'server') as 'local' | 'server',
+  /** `local` = Qwen3-VL via Ollama sur le PC (développement) ; `server` = Edge Function (Claude) ; `none` = saisie manuelle. */
+  aiProvider: (process.env.EXPO_PUBLIC_AI_PROVIDER ?? 'server') as 'local' | 'server' | 'none',
   localAiModel: process.env.EXPO_PUBLIC_LOCAL_AI_MODEL ?? 'qwen3-vl:2b-instruct',
   /** Commission plateforme appliquée aux ventes (affichage ; le calcul fait foi côté serveur). */
   platformFeeRate: 0.12,

@@ -1,0 +1,88 @@
+# Construit l'APK Android de test dans le cloud GitHub, puis le publie dans « Releases ».
+# Déclenchement : à chaque mise à jour de la branche main (hors documentation), ou à la main
+# (onglet Actions → « APK Android » → Run workflow).
+# Aucun compte Expo requis : build natif Gradle sur un runner Ubuntu.
+name: APK Android
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+      - 'scripts/**'
+
+permissions:
+  contents: write # nécessaire pour créer la Release qui héberge l'APK
+
+concurrency:
+  group: android-apk
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      # Valeurs PUBLIQUES (embarquées dans l'app) : Settings → Secrets and variables → Actions → Variables.
+      EXPO_PUBLIC_SUPABASE_URL: ${{ vars.EXPO_PUBLIC_SUPABASE_URL }}
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+      EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ vars.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
+      # L'IA locale (Ollama) n'existe que sur le PC de développement : l'APK utilise `server` (Claude) ou `none`.
+      EXPO_PUBLIC_AI_PROVIDER: ${{ vars.EXPO_PUBLIC_AI_PROVIDER || 'none' }}
+      # Facultatif : clé Google Maps Android (sinon l'onglet Carte affiche une liste par distance).
+      GOOGLE_MAPS_ANDROID_API_KEY: ${{ secrets.GOOGLE_MAPS_ANDROID_API_KEY }}
+      NODE_OPTIONS: --max-old-space-size=4096
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Dépendances
+        run: npm ci
+
+      - name: Vérification TypeScript
+        run: npx tsc --noEmit
+
+      - name: Génération du projet Android natif
+        run: npx expo prebuild --platform android --no-install --clean
+
+      - name: Compilation de l'APK
+        working-directory: android
+        run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a,armeabi-v7a
+
+      - name: Nom du fichier
+        id: apk
+        run: |
+          NAME="Homemade-test-${GITHUB_RUN_NUMBER}.apk"
+          cp android/app/build/outputs/apk/release/app-release.apk "$NAME"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          ls -lh "$NAME"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.apk.outputs.name }}
+          path: ${{ steps.apk.outputs.name }}
+          retention-days: 14
+
+      - name: Publication dans Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "apk-${GITHUB_RUN_NUMBER}" "${{ steps.apk.outputs.name }}" \
+            --title "Homemade — APK de test n°${GITHUB_RUN_NUMBER}" \
+            --notes "APK de TEST (signé avec la clé de débogage, ne pas distribuer au public).
+          Installation : ouvrir ce lien sur le téléphone Android, télécharger le fichier .apk, puis l'ouvrir.
+          Commit : ${GITHUB_SHA::7}" \
+            --latest

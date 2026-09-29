@@ -5,8 +5,10 @@ import { FlatList, Pressable, StyleSheet, Text, useWindowDimensions, View } from
 import MapView, { Circle, Marker } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FilterSheet } from '@/components/FilterSheet';
+import { MapFallback } from '@/components/MapFallback';
 import { MealCard } from '@/components/MealCard';
 import { Chip } from '@/components/ui';
+import { mapsAvailable } from '@/lib/capabilities';
 import { formatPrice } from '@/lib/format';
 import { useFeed } from '@/lib/useFeed';
 import { activeFilterCount, useApp } from '@/store/app';
@@ -28,6 +30,10 @@ const MAP_STYLE = [
 ];
 
 export default function MapScreen() {
+  return mapsAvailable() ? <GoogleMapScreen /> : <MapFallback />;
+}
+
+function GoogleMapScreen() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const mapRef = useRef<MapView>(null);

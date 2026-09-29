@@ -1,11 +1,15 @@
 /**
- * Pipeline IA côté client : compression → (upload Storage) → analyse.
- *   - EXPO_PUBLIC_AI_PROVIDER=local  → Qwen3-VL sur le PC via Ollama (développement, gratuit) — voir localAi.ts
- *   - sinon, backend configuré       → Edge Function `analyze-meal` (Claude ; la clé ne quitte jamais le serveur)
- *   - sinon                          → analyse simulée (mode démo)
+ * Pipeline photo → annonce :
+ *   1. preparePhoto()     : redimensionnement + compression (JPEG 1280 px, EXIF non conservé)
+ *   2. uploadMealPhoto()  : envoi dans Storage (indépendant de l'IA : la photo n'est jamais perdue)
+ *   3. analyzeMealPhoto() : pré-remplissage selon EXPO_PUBLIC_AI_PROVIDER
+ *        - local  → Qwen3-VL sur le PC via Ollama (développement, gratuit) — voir localAi.ts
+ *        - server → Edge Function `analyze-meal` (Claude ; la clé ne quitte jamais le serveur)
+ *        - none   → pas d'IA : saisie manuelle (ex. APK sans IA configurée)
+ *      Mode démo (sans backend) : analyse simulée.
  */
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
-import { DEMO_MODE } from '@/lib/config';
+import { config, DEMO_MODE } from '@/lib/config';
 import { requireSupabase } from '@/lib/supabase';
 import { demoAnalysis } from '@/data/mock';
 import type { AiMealAnalysis } from '@/types';
@@ -27,13 +31,9 @@ export async function preparePhoto(uri: string): Promise<PreparedPhoto> {
   return { uri: result.uri, width: result.width, height: result.height, base64: result.base64 ?? undefined };
 }
 
-export interface AnalyzeResult {
-  analysis: AiMealAnalysis;
-  photoPath: string | null;
-  aiAnalysisId: string | null;
-}
-
-async function uploadPhoto(photo: PreparedPhoto, userId: string): Promise<string> {
+/** Envoie la photo dans Storage (`meal-photos/<uid>/…`). Renvoie null en mode démo. */
+export async function uploadMealPhoto(photo: PreparedPhoto, userId: string): Promise<string | null> {
+  if (DEMO_MODE) return null;
   const path = `${userId}/${Date.now()}.jpg`;
   const body = await (await fetch(photo.uri)).arrayBuffer();
   const { error } = await requireSupabase().storage.from('meal-photos').upload(path, body, { contentType: 'image/jpeg', upsert: false });
@@ -41,24 +41,27 @@ async function uploadPhoto(photo: PreparedPhoto, userId: string): Promise<string
   return path;
 }
 
-export async function analyzeMealPhoto(photo: PreparedPhoto, userId: string): Promise<AnalyzeResult> {
+/** L'IA pré-remplit-elle l'annonce dans cet environnement ? (Sinon : saisie manuelle directe.) */
+export const aiEnabled = () => DEMO_MODE || localAiAvailable() || config.aiProvider === 'server';
+
+export interface AnalyzeResult {
+  analysis: AiMealAnalysis | null;
+  aiAnalysisId: string | null;
+}
+
+export async function analyzeMealPhoto(photo: PreparedPhoto, photoPath: string | null): Promise<AnalyzeResult> {
   if (localAiAvailable() && photo.base64) {
-    // La photo est tout de même stockée (si le backend est configuré) pour illustrer l'annonce.
-    const [analysis, photoPath] = await Promise.all([
-      analyzeWithLocalModel(photo.base64),
-      DEMO_MODE ? Promise.resolve(null) : uploadPhoto(photo, userId),
-    ]);
-    return { analysis, photoPath, aiAnalysisId: null };
+    return { analysis: await analyzeWithLocalModel(photo.base64), aiAnalysisId: null };
   }
   if (DEMO_MODE) {
     await new Promise((r) => setTimeout(r, 2200));
-    return { analysis: demoAnalysis, photoPath: null, aiAnalysisId: null };
+    return { analysis: demoAnalysis, aiAnalysisId: null };
   }
-  const path = await uploadPhoto(photo, userId);
+  if (config.aiProvider !== 'server' || !photoPath) return { analysis: null, aiAnalysisId: null };
   const { data, error } = await requireSupabase().functions.invoke<{ analysis: AiMealAnalysis; analysis_id: string }>('analyze-meal', {
-    body: { photo_path: path },
+    body: { photo_path: photoPath },
   });
   if (error) throw error;
   if (!data) throw new Error('Réponse IA vide');
-  return { analysis: data.analysis, photoPath: path, aiAnalysisId: data.analysis_id };
+  return { analysis: data.analysis, aiAnalysisId: data.analysis_id };
 }
