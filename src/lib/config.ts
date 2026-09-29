@@ -10,6 +10,8 @@ export const config = {
   /** `local` = Qwen3-VL via Ollama sur le PC (développement) ; `server` = Edge Function (Claude) ; `none` = saisie manuelle. */
   aiProvider: (process.env.EXPO_PUBLIC_AI_PROVIDER ?? 'server') as 'local' | 'server' | 'none',
   localAiModel: process.env.EXPO_PUBLIC_LOCAL_AI_MODEL ?? 'qwen3-vl:2b-instruct',
+  /** Lien PUBLIC de téléchargement de l'app de test (ex. dossier Google Drive), ajouté aux invitations partagées. */
+  betaDownloadUrl: process.env.EXPO_PUBLIC_BETA_DOWNLOAD_URL ?? '',
   /** Commission plateforme appliquée aux ventes (affichage ; le calcul fait foi côté serveur). */
   platformFeeRate: 0.12,
   defaultRegion: { latitude: 45.5231, longitude: -73.5817, latitudeDelta: 0.06, longitudeDelta: 0.06 }, // Plateau, Montréal

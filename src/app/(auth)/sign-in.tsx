@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
 import { AuthScaffold } from '@/components/AuthScaffold';
 import { Button, TextField } from '@/components/ui';
+import { friendlyError } from '@/lib/errors';
 import { sendPasswordReset, signIn } from '@/services/auth';
 import { colors, fonts, spacing, type } from '@/theme';
 
@@ -22,7 +23,7 @@ export default function SignIn() {
     try {
       await signIn(email.trim().toLowerCase(), password);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Connexion impossible.');
+      setError(friendlyError(e, 'Connexion impossible.'));
     } finally {
       setLoading(false);
     }

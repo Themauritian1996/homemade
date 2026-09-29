@@ -133,6 +133,12 @@ stateDiagram-v2
 - `ai_analyses` — journal de chaque analyse (modèle, version du prompt, latence, jetons, résultat) + `validation_diff` (faux positifs / faux négatifs par rapport à la validation humaine). C'est le jeu d'évaluation vivant de l'IA.
 - `stripe_events` — idempotence des webhooks.
 
+### Bêta fermée (migration `20260929000100_beta.sql`)
+- `app_config` — réglages serveur. `invite_required` (défaut **vrai**, fail-closed) : l'inscription exige un code.
+- `beta_invites` — codes d'invitation (`max_uses`, `uses`, `expires_at`, `created_by`). Le trigger `handle_new_user` **consomme le code dans la même transaction** que la création du compte ; code absent, inconnu, expiré ou épuisé ⇒ inscription refusée (`INVITE_CODE_INVALID`). Chaque membre obtient un code personnel de 5 invitations (`my_invite_code`). Illisible par les clients.
+- `beta_feedback` — commentaires des testeurs (bogue, idée…), insertion en son nom uniquement (RLS).
+- `ai_analyses.task` — `meal` (photo du plat) ou `ocr` (lecture d'étiquette / de recette).
+
 ## RPC exposées à l'app
 
 | Fonction | Usage |
@@ -147,6 +153,11 @@ stateDiagram-v2
 | `get_reviews_for_user(user, role, limit)` | Avis visibles |
 | `my_conversations()` / `mark_conversation_read(id)` | Messagerie |
 | `get_pickup_details(order)` | Adresse exacte (parties d'une commande acceptée) |
+| `invite_status(code)` *(aussi `anon`)* | Code d'invitation valide ? invitation exigée ? |
+| `my_invite_code()` | Code personnel (créé à la demande, 5 invitations) |
+| `session_bootstrap()` | À l'ouverture de session : profil santé, onboardé, compte supprimé |
+| `my_meals()` / `withdraw_meal(id)` | Espace Cooker : mes annonces, retrait (refusé si commande/échange accepté en cours) |
+| `export_my_data()` / `delete_my_account()` | Loi 25 : copie des données, suppression (profil anonymisé, santé effacée, annonces retirées ; refusée si commande payante en cours) |
 
 Réservées au *service role* : `create_purchase_order`, `apply_payment_event`, `meal_is_safe_for`, `expire_meals`, `reveal_stale_reviews`, `cancel_stale_orders`.
 
@@ -155,4 +166,4 @@ Réservées au *service role* : `create_purchase_order`, `apply_payment_event`, 
 ```bash
 npm run test:db
 ```
-Exécute les trois migrations + le seed sur un vrai Postgres (PGlite + PostGIS, sans Docker) puis un scénario de bout en bout : filet de sécurité du dictionnaire, implications, validations bloquantes, filtrage du fil, commande complète avec audit, avis double-aveugle, sécurité bidirectionnelle des échanges, suspension sur incident, privilèges de colonnes et de fonctions.
+Exécute toutes les migrations + le seed sur un vrai Postgres (PGlite + PostGIS, sans Docker) puis un scénario de bout en bout : filet de sécurité du dictionnaire, implications, validations bloquantes, filtrage du fil, commande complète avec audit, avis double-aveugle, sécurité bidirectionnelle des échanges, suspension sur incident, privilèges de colonnes et de fonctions, et pour la bêta : codes d'invitation (valide, inconnu, épuisé, expiré, personnel, inscriptions ouvertes), état de session, retrait d'annonce, commentaires, export et suppression de compte.

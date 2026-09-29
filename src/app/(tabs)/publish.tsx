@@ -8,19 +8,55 @@ import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
-import { Alert, Animated, Easing, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Animated,
+  Easing,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AllergenPicker } from '@/components/AllergenPicker';
+import { PickupPicker } from '@/components/PickupPicker';
 import { Badge, Button, Chip, TextField } from '@/components/ui';
 import { ALLERGENS, AllergenCode, CUISINES, CuisineCode, DIETS, DietCode, allergenById } from '@/data/allergens';
 import { config } from '@/lib/config';
+import { friendlyError } from '@/lib/errors';
 import { declaredAllergens, validateMealDraft } from '@/lib/mealValidation';
 import { expandAllergens } from '@/lib/safety';
-import { aiEnabled, analyzeMealPhoto, preparePhoto, PreparedPhoto, uploadMealPhoto } from '@/services/ai';
+import { ingredientsFromScan, mergeScan } from '@/lib/scanMerge';
+import { useAiAvailable } from '@/lib/useAiAvailable';
+import { aiAvailable, analyzeMealPhoto, preparePhoto, PreparedPhoto, scanText, uploadMealPhoto } from '@/services/ai';
 import { publishMeal } from '@/services/meals';
 import { useApp } from '@/store/app';
 import { colors, fonts, radius, shadow, spacing, type } from '@/theme';
-import type { AiMealAnalysis, MealIngredient, MealMode } from '@/types';
+import type { AiMealAnalysis, AiTextScan, GeoPoint, MealIngredient, MealMode } from '@/types';
+
+/** Sans clé Stripe, la vente est impossible côté serveur : la bêta se fait en mode échange. */
+const SALES_ENABLED = Boolean(config.stripePublishableKey);
+
+/** Photo depuis l'appareil photo ou la galerie (permissions demandées au besoin). */
+async function pickImage(source: 'camera' | 'library', aspect?: [number, number]): Promise<string | null> {
+  const perm = source === 'camera' ? await ImagePicker.requestCameraPermissionsAsync() : await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if (!perm.granted) {
+    Alert.alert(
+      'Permission requise',
+      source === 'camera' ? 'Autorisez l’appareil photo dans les réglages du téléphone.' : 'Autorisez l’accès aux photos dans les réglages du téléphone.',
+    );
+    return null;
+  }
+  const opts: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], quality: 0.9, allowsEditing: Boolean(aspect), aspect };
+  const res = source === 'camera' ? await ImagePicker.launchCameraAsync(opts) : await ImagePicker.launchImageLibraryAsync(opts);
+  return res.canceled || !res.assets[0] ? null : res.assets[0].uri;
+}
 
 type Step = 'capture' | 'analyzing' | 'review' | 'done';
 
@@ -36,26 +72,23 @@ export default function Publish() {
   const user = useApp((s) => s.user);
 
   const pick = async (source: 'camera' | 'library') => {
-    const perm = source === 'camera' ? await ImagePicker.requestCameraPermissionsAsync() : await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) return Alert.alert('Permission requise', 'Autorisez l’accès pour photographier votre plat.');
-    const opts: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], quality: 0.9, allowsEditing: true, aspect: [4, 3] };
-    const res = source === 'camera' ? await ImagePicker.launchCameraAsync(opts) : await ImagePicker.launchImageLibraryAsync(opts);
-    if (res.canceled || !res.assets[0]) return;
+    const uri = await pickImage(source, [4, 3]);
+    if (!uri) return;
     let prepared: PreparedPhoto;
     let path: string | null = null;
     try {
-      prepared = await preparePhoto(res.assets[0].uri);
+      prepared = await preparePhoto(uri);
       setPhoto(prepared);
       setStep('analyzing');
       // La photo est enregistrée avant (et indépendamment de) l'IA : elle n'est jamais perdue.
       path = await uploadMealPhoto(prepared, user?.id ?? 'anon');
       setPhotoPath(path);
     } catch (e) {
-      Alert.alert('Photo non enregistrée', e instanceof Error ? e.message : 'Vérifiez votre connexion et réessayez.');
+      Alert.alert('Photo non enregistrée', friendlyError(e, 'Vérifiez votre connexion et réessayez.'));
       setStep('capture');
       return;
     }
-    if (!aiEnabled()) {
+    if (!(await aiAvailable())) {
       setAnalysis(null);
       setStep('review');
       return;
@@ -95,16 +128,26 @@ export default function Publish() {
 // ───────────────────────────────────────── Capture
 function CaptureStep({ onPick }: { onPick: (s: 'camera' | 'library') => void }) {
   const insets = useSafeAreaInsets();
+  const ai = useAiAvailable();
   return (
     <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ paddingTop: insets.top + spacing.xl, padding: spacing.xl, gap: spacing.xl }}>
       <View style={{ gap: spacing.sm }}>
         <Text style={type.label}>Espace Cooker</Text>
         <Text style={type.h1}>Partagez votre plat</Text>
         <Text style={type.body}>
-          {aiEnabled()
+          {ai !== false
             ? "Prenez une photo : notre IA prépare l'annonce pour vous — type de plat, ingrédients et allergènes. Vous vérifiez, vous publiez."
             : 'Prenez une photo, décrivez les ingrédients et déclarez les allergènes. Vos voisins allergiques seront protégés automatiquement.'}
         </Text>
+        <View style={{ flexDirection: 'row' }}>
+          {ai === null ? (
+            <Badge label="Vérification de l'IA…" icon="hourglass-outline" />
+          ) : ai ? (
+            <Badge label="IA active · photo + lecture d'étiquettes" tone="forest" icon="sparkles" />
+          ) : (
+            <Badge label="IA indisponible · saisie manuelle" tone="saffron" icon="create-outline" />
+          )}
+        </View>
       </View>
 
       <Pressable onPress={() => onPick('camera')} style={({ pressed }) => [styles.captureCard, pressed && { opacity: 0.92 }]}>
@@ -116,7 +159,7 @@ function CaptureStep({ onPick }: { onPick: (s: 'camera' | 'library') => void }) 
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <Ionicons name="sparkles" size={14} color={colors.saffron} />
           <Text style={{ fontFamily: fonts.medium, color: 'rgba(255,255,255,0.85)' }}>
-            {aiEnabled() ? "Annonce pré-remplie par l'IA en quelques secondes" : 'Annonce prête en une minute'}
+            {ai !== false ? "Annonce pré-remplie par l'IA en quelques secondes" : 'Annonce prête en une minute'}
           </Text>
         </View>
       </Pressable>
@@ -189,6 +232,9 @@ function ReviewStep({
 }) {
   const insets = useSafeAreaInsets();
   const location = useApp((s) => s.location);
+  const hasRealLocation = useApp((s) => s.hasRealLocation);
+  const userId = useApp((s) => s.user?.id ?? 'anon');
+  const ai = useAiAvailable();
 
   const [title, setTitle] = useState(analysis?.title ?? '');
   const [description, setDescription] = useState(analysis?.description ?? '');
@@ -204,11 +250,15 @@ function ReviewStep({
   const [mayContain, setMayContain] = useState<AllergenCode[]>([]);
   const [diets, setDiets] = useState<DietCode[]>(analysis?.diets ?? []);
   // Sans Stripe configuré, la vente est impossible côté serveur : on propose l'échange par défaut.
-  const [mode, setMode] = useState<MealMode>(config.stripePublishableKey ? 'sale' : 'swap');
+  const [mode, setMode] = useState<MealMode>(SALES_ENABLED ? 'sale' : 'swap');
   const [price, setPrice] = useState('12');
   const [portions, setPortions] = useState(3);
   const [hours, setHours] = useState(24);
   const [pickupArea, setPickupArea] = useState('');
+  const [pickup, setPickup] = useState<GeoPoint>(location);
+  const [pickupConfirmed, setPickupConfirmed] = useState(hasRealLocation);
+  const [scanning, setScanning] = useState(false);
+  const [scan, setScan] = useState<AiTextScan | null>(null);
   const [attested, setAttested] = useState(false);
   const [newIngredient, setNewIngredient] = useState('');
   const [editing, setEditing] = useState<number | null>(null);
@@ -236,7 +286,46 @@ function ReviewStep({
     setNewIngredient('');
   };
 
+  const startScan = () =>
+    Alert.alert(
+      'Lire une étiquette ou une recette',
+      "Photographiez la liste d'ingrédients d'un produit utilisé (sauce, bouillon, chocolat…) ou votre fiche recette. L'IA ajoute ingrédients et allergènes ; vous vérifiez.",
+      [
+        { text: 'Annuler', style: 'cancel' },
+        { text: 'Galerie', onPress: () => runScan('library') },
+        { text: 'Appareil photo', onPress: () => runScan('camera') },
+      ],
+    );
+
+  const runScan = async (source: 'camera' | 'library') => {
+    const uri = await pickImage(source);
+    if (!uri) return;
+    setScanning(true);
+    try {
+      setScan(await scanText(uri, userId));
+    } catch (e) {
+      Alert.alert('Lecture impossible', `${friendlyError(e, 'L’IA n’a pas pu lire cette photo.')}\n\nAjoutez les ingrédients à la main.`);
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  const applyScan = (s: AiTextScan) => {
+    const merged = mergeScan({ ingredients, extra, mayContain }, s);
+    setIngredients(merged.ingredients);
+    setExtra(merged.extra);
+    setMayContain(merged.mayContain);
+    if (!title.trim() && s.source === 'recipe' && s.title) setTitle(s.title);
+    setScan(null);
+  };
+
   const submit = async () => {
+    if (!pickupConfirmed) {
+      return Alert.alert(
+        'Lieu de cueillette',
+        'Placez l’épingle sur votre lieu de cueillette (ou utilisez votre position actuelle) pour que vos voisins trouvent le plat.',
+      );
+    }
     const errors = validateMealDraft({ title, ingredients, allergens, diets, mode, priceCents, portions, attestation: attested });
     if (errors.length) return Alert.alert('À compléter', errors.join('\n\n'));
     setPublishing(true);
@@ -255,13 +344,13 @@ function ReviewStep({
         priceCents,
         portions,
         availableHours: hours,
-        pickup: location,
+        pickup,
         pickupArea: pickupArea.trim() || 'Quartier communiqué après confirmation',
         cookerAttestation: attested,
       });
       onPublished();
     } catch (e) {
-      Alert.alert('Publication impossible', e instanceof Error ? e.message : 'Réessayez.');
+      Alert.alert('Publication impossible', friendlyError(e));
     } finally {
       setPublishing(false);
     }
@@ -358,6 +447,20 @@ function ReviewStep({
                   <Ionicons name="add" size={20} color={colors.onDark} />
                 </Pressable>
               </View>
+              {ai && (
+                <Pressable
+                  onPress={startScan}
+                  disabled={scanning}
+                  style={({ pressed }) => [styles.scanBtn, pressed && { opacity: 0.85 }]}
+                  accessibilityRole="button"
+                >
+                  {scanning ? <ActivityIndicator color={colors.forest} /> : <Ionicons name="scan-outline" size={20} color={colors.forest} />}
+                  <View style={{ flex: 1 }}>
+                    <Text style={[type.bodyStrong, { color: colors.forest }]}>{scanning ? 'Lecture en cours…' : 'Scanner une étiquette ou une recette'}</Text>
+                    <Text style={type.caption}>L'IA lit la liste d'ingrédients et les mentions « Contient » / « Peut contenir ».</Text>
+                  </View>
+                </Pressable>
+              )}
             </View>
           </Section>
 
@@ -402,10 +505,13 @@ function ReviewStep({
                   ['swap', 'Échange', 'swap-horizontal'],
                   ['both', 'Les deux', 'git-compare-outline'],
                 ] as const
-              ).map(([id, label, icon]) => (
-                <Chip key={id} icon={icon} label={label} selected={mode === id} onPress={() => setMode(id)} />
-              ))}
+              )
+                .filter(([id]) => SALES_ENABLED || id === 'swap')
+                .map(([id, label, icon]) => (
+                  <Chip key={id} icon={icon} label={label} selected={mode === id} onPress={() => setMode(id)} />
+                ))}
             </View>
+            {!SALES_ENABLED && <Text style={type.caption}>Pendant la bêta, les plats s'échangent entre voisins. La vente sera activée ensuite.</Text>}
             {mode !== 'swap' && (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
                 <View style={{ flex: 1 }}>
@@ -418,8 +524,10 @@ function ReviewStep({
           <Section title="Disponibilité">
             <Stepper label="Portions" value={portions} onChange={setPortions} min={1} max={20} />
             <Stepper label="Disponible pendant" value={hours} onChange={setHours} min={2} max={72} step={2} suffix=" h" />
-            <TextField label="Lieu de cueillette (approximatif)" value={pickupArea} onChangeText={setPickupArea} placeholder="Ex. Plateau — près du parc Laurier" icon="location-outline" />
-            <Text style={type.caption}>Votre adresse exacte n'est partagée qu'après confirmation d'une commande.</Text>
+          </Section>
+
+          <Section title="Lieu de cueillette">
+            <PickupPicker value={pickup} onChange={setPickup} area={pickupArea} onAreaChange={setPickupArea} onConfirmed={() => setPickupConfirmed(true)} />
           </Section>
 
           <Pressable onPress={() => setAttested(!attested)} style={[styles.attest, attested && { borderColor: colors.forest, backgroundColor: colors.sage }]}>
@@ -430,10 +538,108 @@ function ReviewStep({
           </Pressable>
         </View>
       </ScrollView>
+      <ScanSheet
+        scan={scan}
+        onClose={() => setScan(null)}
+        onApply={applyScan}
+        onRetry={() => {
+          setScan(null);
+          startScan();
+        }}
+      />
       <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
         <Button title="Publier le plat" variant="accent" icon="checkmark-circle" onPress={submit} loading={publishing} disabled={!attested} />
       </View>
     </KeyboardAvoidingView>
+  );
+}
+
+// ───────────────────────────────────────── Résultat de lecture (OCR)
+function ScanSheet({
+  scan,
+  onClose,
+  onApply,
+  onRetry,
+}: {
+  scan: AiTextScan | null;
+  onClose: () => void;
+  onApply: (s: AiTextScan) => void;
+  onRetry: () => void;
+}) {
+  const insets = useSafeAreaInsets();
+  const [showText, setShowText] = useState(false);
+  if (!scan) return null;
+  const empty = scan.source === 'none' || (ingredientsFromScan(scan).length === 0 && scan.contains.length === 0 && scan.mayContain.length === 0);
+  const toAdd = ingredientsFromScan(scan);
+  return (
+    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Fermer" />
+      <View style={[styles.sheet, { paddingBottom: insets.bottom + spacing.lg }]}>
+        <ScrollView contentContainerStyle={{ gap: spacing.lg }}>
+          <View style={{ gap: 4 }}>
+            <Text style={type.label}>{scan.source === 'label' ? 'Étiquette lue' : scan.source === 'recipe' ? 'Recette lue' : 'Texte lu'}</Text>
+            <Text style={type.h2}>{empty ? 'Aucun texte exploitable' : scan.title || 'Voici ce que l’IA a lu'}</Text>
+          </View>
+          {empty ? (
+            <Text style={type.body}>Photographiez la liste d'ingrédients de près, bien à plat et sans reflet.</Text>
+          ) : (
+            <>
+              <View style={{ gap: spacing.sm }}>
+                <Text style={type.h3}>{scan.source === 'label' ? 'Ingrédient ajouté' : `Ingrédients ajoutés · ${toAdd.length}`}</Text>
+                {toAdd.map((i) => (
+                  <Text key={i.name} style={type.body}>
+                    • {i.name}
+                    {i.allergens.length ? `  —  ${i.allergens.map((a) => allergenById(a).fr).join(', ')}` : ''}
+                  </Text>
+                ))}
+              </View>
+              {scan.contains.length > 0 && (
+                <View style={{ gap: spacing.sm }}>
+                  <Text style={type.h3}>Contient</Text>
+                  <View style={styles.wrap}>
+                    {scan.contains.map((a) => (
+                      <Badge key={a} label={`${allergenById(a).emoji} ${allergenById(a).fr}`} tone="danger" />
+                    ))}
+                  </View>
+                </View>
+              )}
+              {scan.mayContain.length > 0 && (
+                <View style={{ gap: spacing.sm }}>
+                  <Text style={type.h3}>Peut contenir (traces)</Text>
+                  <View style={styles.wrap}>
+                    {scan.mayContain.map((a) => (
+                      <Badge key={a} label={`${allergenById(a).emoji} ${allergenById(a).fr}`} tone="saffron" />
+                    ))}
+                  </View>
+                </View>
+              )}
+              {scan.warnings.map((w) => (
+                <Text key={w} style={[type.caption, { color: colors.warning }]}>
+                  ⚠︎ {w}
+                </Text>
+              ))}
+              {!!scan.text && (
+                <Pressable onPress={() => setShowText(!showText)} style={styles.transcript}>
+                  <Text style={[type.caption, { color: colors.forest, fontFamily: fonts.semibold }]}>
+                    {showText ? 'Masquer le texte lu' : 'Comparer avec le texte lu'}
+                  </Text>
+                  {showText && <Text style={[type.caption, { color: colors.inkSoft, marginTop: spacing.sm }]}>{scan.text}</Text>}
+                </Pressable>
+              )}
+              <Text style={type.caption}>Les allergènes lus s'ajoutent à votre annonce ; rien n'est retiré. Vous pourrez tout revoir avant de publier.</Text>
+            </>
+          )}
+        </ScrollView>
+        <View style={{ gap: spacing.sm, marginTop: spacing.lg }}>
+          {empty ? (
+            <Button title="Réessayer" icon="scan-outline" onPress={onRetry} />
+          ) : (
+            <Button title="Ajouter à mon annonce" icon="add-circle-outline" onPress={() => onApply(scan)} />
+          )}
+          <Button title="Annuler" variant="ghost" onPress={onClose} />
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -476,10 +682,10 @@ function DoneStep({ onAgain }: { onAgain: () => void }) {
       </View>
       <Text style={[type.h1, { textAlign: 'center' }]}>Votre plat est en ligne !</Text>
       <Text style={[type.body, { textAlign: 'center' }]}>
-        Il apparaît maintenant sur la carte et dans le fil des voisins compatibles avec ses allergènes. Vous serez notifié à chaque demande.
+        Il apparaît maintenant sur la carte et dans le fil des voisins compatibles avec ses allergènes. Les demandes arrivent dans l'onglet Messages.
       </Text>
       <View style={{ alignSelf: 'stretch', gap: spacing.md, marginTop: spacing.lg }}>
-        <Button title="Voir sur la carte" onPress={() => router.push('/map')} />
+        <Button title="Voir mes plats" onPress={() => router.push('/my-meals')} />
         <Button title="Publier un autre plat" variant="secondary" onPress={onAgain} />
       </View>
     </View>
@@ -515,7 +721,45 @@ const styles = StyleSheet.create({
   addBtn: { width: 48, height: 48, borderRadius: radius.md, backgroundColor: colors.forest, alignItems: 'center', justifyContent: 'center' },
   stepper: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.surface, padding: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border },
   stepBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' },
-  attest: { flexDirection: 'row', gap: spacing.md, padding: spacing.lg, borderRadius: radius.lg, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.surface },
-  footer: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: spacing.xl, paddingTop: spacing.md, backgroundColor: colors.bg, borderTopWidth: 1, borderTopColor: colors.border },
-  doneIcon: { width: 96, height: 96, borderRadius: 48, backgroundColor: colors.forest, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.md },
+  attest: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    padding: spacing.lg,
+    borderRadius: radius.lg,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  footer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.md,
+    backgroundColor: colors.bg,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  scanBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.sage,
+    minHeight: 56,
+  },
+  backdrop: { flex: 1, backgroundColor: colors.overlay },
+  sheet: { maxHeight: '85%', backgroundColor: colors.bg, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, padding: spacing.xl },
+  transcript: { backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: colors.border },
+  doneIcon: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: colors.forest,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
+  },
 });

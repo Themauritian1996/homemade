@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
+import { friendlyError } from '@/lib/errors';
 import { fetchOrder, OrderAction, OrderSummary, transitionOrder } from '@/services/orders';
 import { colors, fonts, radius, spacing } from '@/theme';
 import { Button } from './ui';
@@ -61,7 +62,7 @@ export function OrderActions({ orderId, me, refreshKey }: { orderId: string; me:
       load();
       if (a.to === 'picked_up') router.push({ pathname: '/review/[orderId]', params: { orderId } });
     } catch (e) {
-      Alert.alert('Action impossible', e instanceof Error ? e.message : 'Réessayez.');
+      Alert.alert('Action impossible', friendlyError(e));
     } finally {
       setBusy(false);
     }

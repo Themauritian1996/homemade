@@ -1,5 +1,5 @@
 /** Données de démonstration (Montréal) — utilisées uniquement quand DEMO_MODE est actif. */
-import type { Conversation, Meal, Message, PublicProfile, Review } from '@/types';
+import type { AiTextScan, Conversation, Meal, Message, PublicProfile, Review } from '@/types';
 
 const img = (id: string, w = 900) => `https://images.unsplash.com/photo-${id}?w=${w}&q=75&auto=format&fit=crop`;
 const inHours = (h: number) => new Date(Date.now() + h * 3_600_000).toISOString();
@@ -373,5 +373,24 @@ export const demoAnalysis = {
   ],
   diets: ['dairy_free' as const],
   warnings: ['La sauce n’est pas identifiable avec certitude : vérifiez le blé/gluten.'],
+  modelVersion: 'demo',
+};
+
+/** Lecture d'étiquette simulée (mode démo). */
+export const demoTextScan: AiTextScan = {
+  source: 'label',
+  text: 'SAUCE TERIYAKI — Ingrédients : eau, sauce soya (eau, soya, blé, sel), sucre, vinaigre de riz, ail, gingembre, amidon de maïs. Contient : soya, blé. Peut contenir : sésame.',
+  title: 'Sauce teriyaki',
+  ingredients: [
+    { name: 'Sauce soya', allergens: ['soy', 'wheat', 'gluten'] },
+    { name: 'Sucre', allergens: [] },
+    { name: 'Vinaigre de riz', allergens: [] },
+    { name: 'Ail', allergens: [] },
+    { name: 'Gingembre', allergens: [] },
+  ],
+  contains: ['soy', 'wheat', 'gluten'],
+  mayContain: ['sesame'],
+  confidence: 0.92,
+  warnings: [],
   modelVersion: 'demo',
 };

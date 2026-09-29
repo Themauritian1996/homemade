@@ -23,7 +23,7 @@ flowchart LR
   subgraph Externes["Services externes"]
     CLAUDE[Anthropic API<br/>Claude — vision + JSON structuré]
     STRIPE[Stripe Connect<br/>Express · capture manuelle]
-    MAPS[Google Maps SDK]
+    MAPS[OpenStreetMap · CARTO<br/>tuiles sans clé]
     PUSH[Expo Push]
   end
 
@@ -54,7 +54,7 @@ flowchart LR
 | Comptes | **Supabase Auth** | Courriel/mot de passe dès le MVP, Google et Apple Sign-In en phase 2 (Apple obligatoire sur iOS si un autre login social est offert). Le trigger `handle_new_user` crée profil, données privées et réglages. |
 | IA visuelle | **Claude (Anthropic API) — `claude-opus-5`** via Edge Function | Voir comparatif ci-dessous. |
 | Paiement | **Stripe Connect Express** + PaymentSheet | Marketplace à deux côtés : Stripe gère le KYC des Cookers, les virements, les litiges. *Destination charges* + `application_fee_amount` pour la commission. **Capture manuelle** : l'Eater est pré-autorisé à la commande, débité à la cueillette. |
-| Carte | **react-native-maps** (Google Maps sur Android, Apple Maps sur iOS) | Inclus dans Expo Go, marqueurs personnalisés (pastilles de prix), style de carte assorti à la marque. |
+| Carte | **Leaflet + OpenStreetMap** (fond CARTO Voyager) dans une WebView (`react-native-webview`) | **Aucune clé ni facturation** (Google Maps exige une clé dans l'APK) ; même rendu dans Expo Go, l'APK et l'aperçu web ; pastilles de prix en HTML, sélecteur de point de cueillette. Leaflet est chargé depuis le CDN avec empreinte SRI ; hors ligne, repli automatique sur la liste par distance. |
 | Temps réel | **Supabase Realtime** | Chat et suivi de commande sans serveur WebSocket à maintenir ; la RLS filtre les événements. |
 
 ### Quelle IA pour la reconnaissance des plats ?

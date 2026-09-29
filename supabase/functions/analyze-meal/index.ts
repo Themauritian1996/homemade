@@ -1,9 +1,22 @@
-// POST /functions/v1/analyze-meal  { photo_path }
+// POST /functions/v1/analyze-meal  { photo_path, task?: 'meal' | 'ocr' }  ·  { ping: true }
 // Photo (Storage) → Claude (vision + sortie JSON contrainte par schéma) → nettoyage → journal ai_analyses.
+//   task = meal : reconnaissance du plat (titre, ingrédients, allergènes)
+//   task = ocr  : lecture d'une étiquette ou d'une recette (texte, ingrédients, « Contient », « Peut contenir »)
+//   ping        : l'app vérifie que l'IA est configurée (sinon : saisie manuelle, sans attendre d'erreur)
 // La clé ANTHROPIC_API_KEY ne quitte jamais le serveur.
 import Anthropic from 'npm:@anthropic-ai/sdk@0.128';
 import { adminClient, env, handler, HttpError, json, requireUser } from '../_shared/http.ts';
-import { OUTPUT_SCHEMA, PROMPT_VERSION, RawAnalysis, sanitize, SYSTEM_PROMPT } from './prompt.ts';
+import {
+  OCR_OUTPUT_SCHEMA,
+  OCR_SYSTEM_PROMPT,
+  OUTPUT_SCHEMA,
+  PROMPT_VERSION,
+  RawAnalysis,
+  RawTextScan,
+  sanitize,
+  sanitizeOcr,
+  SYSTEM_PROMPT,
+} from './prompt.ts';
 
 const MODEL = env('AI_MODEL', 'claude-opus-5');
 // Effort de raisonnement : « medium » équilibre latence (~quelques secondes) et rigueur sur les allergènes.
@@ -11,7 +24,13 @@ const EFFORT = env('AI_EFFORT', 'medium') as 'low' | 'medium' | 'high';
 const MAX_ANALYSES_PER_HOUR = Number(env('AI_MAX_PER_HOUR', '20'));
 const MAX_BYTES = 5 * 1024 * 1024;
 
-const anthropic = new Anthropic({ apiKey: env('ANTHROPIC_API_KEY') });
+const API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
+const anthropic = API_KEY ? new Anthropic({ apiKey: API_KEY }) : null;
+
+const TASKS = {
+  meal: { system: SYSTEM_PROMPT, schema: OUTPUT_SCHEMA, instruction: 'Analyse ce plat pour pré-remplir son annonce.' },
+  ocr: { system: OCR_SYSTEM_PROMPT, schema: OCR_OUTPUT_SCHEMA, instruction: 'Lis le texte de cette photo (étiquette ou recette) et extrais ingrédients et allergènes.' },
+} as const;
 
 function toBase64(bytes: Uint8Array): string {
   let binary = '';
@@ -22,7 +41,11 @@ function toBase64(bytes: Uint8Array): string {
 Deno.serve(
   handler(async (req) => {
     const { user } = await requireUser(req);
-    const { photo_path } = (await req.json()) as { photo_path?: string };
+    const body = (await req.json()) as { photo_path?: string; task?: string; ping?: boolean };
+    if (body.ping) return json({ ok: anthropic !== null, model: MODEL, prompt_version: PROMPT_VERSION });
+    if (!anthropic) throw new HttpError(503, 'AI_NOT_CONFIGURED', 'Analyse indisponible, saisie manuelle possible.');
+    const { photo_path } = body;
+    const task = body.task === 'ocr' ? 'ocr' : 'meal';
     if (!photo_path || !photo_path.startsWith(`${user.id}/`)) throw new HttpError(400, 'INVALID_PHOTO_PATH');
 
     const admin = adminClient();
@@ -39,7 +62,7 @@ Deno.serve(
     const mediaType = blob.type === 'image/png' || blob.type === 'image/webp' ? blob.type : 'image/jpeg';
 
     const log = (row: Record<string, unknown>) =>
-      admin.from('ai_analyses').insert({ user_id: user.id, photo_path, model: MODEL, prompt_version: PROMPT_VERSION, ...row }).select('id').single();
+      admin.from('ai_analyses').insert({ user_id: user.id, photo_path, task, model: MODEL, prompt_version: PROMPT_VERSION, ...row }).select('id').single();
 
     const started = Date.now();
     let response: Anthropic.Beta.Messages.BetaMessage;
@@ -51,14 +74,14 @@ Deno.serve(
         betas: ['server-side-fallback-2026-07-01'],
         fallbacks: 'default',
         thinking: { type: 'adaptive' },
-        output_config: { effort: EFFORT, format: { type: 'json_schema', schema: OUTPUT_SCHEMA } },
-        system: SYSTEM_PROMPT,
+        output_config: { effort: EFFORT, format: { type: 'json_schema', schema: TASKS[task].schema } },
+        system: TASKS[task].system,
         messages: [
           {
             role: 'user',
             content: [
               { type: 'image', source: { type: 'base64', media_type: mediaType, data: toBase64(bytes) } },
-              { type: 'text', text: 'Analyse ce plat pour pré-remplir son annonce.' },
+              { type: 'text', text: TASKS[task].instruction },
             ],
           },
         ],
@@ -80,15 +103,22 @@ Deno.serve(
     }
 
     const text = response.content.flatMap((b) => (b.type === 'text' ? [b.text] : [])).join('');
-    let raw: RawAnalysis;
+    let raw: unknown;
     try {
-      raw = JSON.parse(text) as RawAnalysis;
+      raw = JSON.parse(text);
     } catch {
       await log({ status: 'failed', error: `JSON invalide (stop_reason=${response.stop_reason})`, latency_ms, ...usage });
       throw new HttpError(502, 'AI_BAD_OUTPUT');
     }
 
-    const analysis = sanitize(raw, response.model);
+    if (task === 'ocr') {
+      const scan = sanitizeOcr(raw as RawTextScan, response.model);
+      const { data: row, error: logErr } = await log({ status: scan.source === 'none' ? 'not_food' : 'ok', result: scan, latency_ms, ...usage });
+      if (logErr) throw logErr;
+      return json({ scan, analysis_id: row.id });
+    }
+
+    const analysis = sanitize(raw as RawAnalysis, response.model);
     const { data: row, error: logErr } = await log({ status: analysis.isFood ? 'ok' : 'not_food', result: analysis, latency_ms, ...usage });
     if (logErr) throw logErr;
 

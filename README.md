@@ -7,7 +7,9 @@ Application mobile *peer-to-peer* d'échange et de vente de repas faits maison �
 |---|---|
 | 📸 **Publication assistée par IA** | Photo du plat → type, ingrédients et allergènes pré-remplis par Claude → le Cooker vérifie et atteste. |
 | 🛡️ **Filtrage santé automatique** | Les plats incompatibles avec vos allergies disparaissent de votre fil et de la carte — décidé côté serveur, *fail-closed*. |
-| 🗺️ **Carte interactive** | Repas autour de vous, filtres distance · cuisine · prix · régimes · achat/échange. |
+| 🗺️ **Carte interactive** | Repas autour de vous (OpenStreetMap, sans clé), filtres distance · cuisine · prix · régimes · achat/échange ; épingle pour le lieu de cueillette. |
+| 🏷️ **Lecture d'étiquettes (OCR)** | Photo de la liste d'ingrédients d'un produit ou d'une recette → ingrédients, « Contient » et « Peut contenir » ajoutés à l'annonce. |
+| 🎟️ **Bêta fermée** | Inscription sur code d'invitation, codes personnels, commentaires des testeurs, export et suppression des données (Loi 25). |
 | ⭐ **Réputation bidirectionnelle** | Cookers **et** Eaters sont notés ; avis en double-aveugle. |
 | 💬 **Chat & transactions** | Paiement Stripe pré-autorisé puis capturé à la cueillette ; échanges par accord mutuel. |
 
@@ -27,7 +29,7 @@ Scannez le QR code avec **Expo Go**. Sans configuration, l'app fonctionne avec d
 Pour activer les vrais comptes, l'IA et les paiements : **[docs/06-setup.md](docs/06-setup.md)**.
 
 ## Stack
-- **App** : React Native 0.86 · Expo SDK 57 · Expo Router · TypeScript strict · Zustand · react-native-maps · Stripe React Native
+- **App** : React Native 0.86 · Expo SDK 57 · Expo Router · TypeScript strict · Zustand · Leaflet/OpenStreetMap (react-native-webview) · Stripe React Native
 - **Back-end** : Supabase — Postgres 15 + PostGIS, RLS, Auth, Storage, Realtime, Edge Functions (Deno), pg_cron
 - **IA** : Anthropic Claude (`claude-opus-5`) — vision + sorties structurées JSON Schema, côté serveur
 - **Paiement** : Stripe Connect Express (destination charges, capture manuelle)

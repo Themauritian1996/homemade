@@ -2,7 +2,9 @@
 
 **Pour tester l'app sur ton téléphone Android, sans savoir coder.**
 
-Tout est déjà installé et configuré : l'app, la base de données en ligne (Supabase) et l'intelligence artificielle gratuite qui analyse les photos (Qwen, sur ta carte graphique RTX 3050).
+Tout est déjà installé et configuré : l'app, la base de données en ligne (Supabase) et l'intelligence artificielle qui analyse les photos et lit les étiquettes (Claude en ligne, ou Qwen gratuit sur ta carte graphique RTX 3050).
+
+> 🆕 **Version bêta** : inscription sur **code d'invitation**, **carte interactive** (sans clé Google), **lecture d'étiquettes par l'IA**, paramètres, « Mes plats », favoris, signalements et commentaires des testeurs. Avant d'inviter du monde, fais une fois l'**Étape 0** ci-dessous.
 
 ## Deux façons de tester
 
@@ -11,9 +13,49 @@ Tout est déjà installé et configuré : l'app, la base de données en ligne (S
 | Principe | L'app est **installée** sur le téléphone, comme une vraie app | Le téléphone affiche l'app pendant que le PC la fait tourner |
 | PC allumé ? | **Non** | Oui, avec la fenêtre noire ouverte |
 | Même Wi-Fi ? | **Non** (4G ou Wi-Fi) | Oui |
-| IA qui remplit l'annonce | Non : tu remplis l'annonce à la main | **Oui** (Qwen sur ta RTX, environ 15 s) |
-| Carte | Liste des plats par distance | Carte interactive Google |
+| IA qui remplit l'annonce et lit les étiquettes | **Oui** si Claude est activé (Étape 0-B), sinon saisie à la main | **Oui** (Qwen sur ta RTX, environ 15 s) |
+| Carte | **Carte interactive** | **Carte interactive** |
 | Mise à jour | Automatique sur GitHub, à réinstaller | Instantanée |
+
+---
+
+## Étape 0 — Préparer la bêta (une seule fois, environ 15 minutes)
+
+### 0-A. Mettre à jour la base de données
+La bêta ajoute des tables (codes d'invitation, commentaires…). Sur le PC, dans le dossier du projet :
+1. Double-clique **`scripts/supabase-login.ps1`** (clic droit → *Exécuter avec PowerShell*) si la CLI Supabase n'est pas encore connectée.
+2. Ouvre un terminal dans le dossier du projet et tape :
+   ```
+   npx supabase db push
+   ```
+3. Réponds **Y** quand il demande de confirmer la migration `20260929000100_beta.sql`.
+
+### 0-B. Activer l'IA en ligne (Claude) — pour que l'APK remplisse les annonces et lise les étiquettes
+Sans cette étape, tout fonctionne quand même : l'app le détecte et propose la saisie à la main.
+1. Crée une clé sur **https://console.anthropic.com** (menu *API Keys*) et ajoute un peu de crédit (5 $ suffisent largement pour des dizaines de testeurs).
+2. Dans le terminal :
+   ```
+   npx supabase secrets set ANTHROPIC_API_KEY=ta-clé-ici
+   npx supabase functions deploy analyze-meal
+   ```
+3. C'est tout : l'APK utilise déjà l'IA « serveur » par défaut. L'écran **Publier** affiche **« IA active »**.
+
+### 0-C. Les codes d'invitation
+- Code de lancement : **`VOISINS2026`** (100 inscriptions). Donne-le à tes premiers testeurs.
+- Chaque membre a aussi **son propre code** (5 invitations) : Profil → **Invitez vos voisins** → Partager.
+- Créer d'autres codes : Supabase → **SQL Editor** → colle puis *Run* :
+  ```sql
+  insert into public.beta_invites (code, note, max_uses) values ('FAMILLE', 'Famille et amis', 20);
+  ```
+- Voir qui a utilisé quoi : `select code, note, uses, max_uses from public.beta_invites;`
+- Ouvrir les inscriptions à tout le monde : `update public.app_config set value = 'false' where key = 'invite_required';`
+
+### 0-D. Donner l'app à tes testeurs
+Le dépôt GitHub est **privé** : tes testeurs ne peuvent pas télécharger l'APK depuis GitHub.
+1. Télécharge l'APK sur ton PC (Méthode A1, depuis ton compte).
+2. Dépose-le dans **Google Drive** → clic droit → *Partager* → *Tous les utilisateurs disposant du lien*.
+3. Envoie ce lien avec le code d'invitation (WhatsApp, courriel…).
+4. Facultatif : sur GitHub → *Settings → Secrets and variables → Actions → Variables*, crée **`EXPO_PUBLIC_BETA_DOWNLOAD_URL`** avec ce lien : il sera ajouté automatiquement aux invitations partagées depuis l'app (à partir de l'APK suivant).
 
 ---
 
@@ -42,7 +84,7 @@ Quand je modifie l'app, une nouvelle version apparaît au même lien (**releases
 |---|---|
 | « Application non installée » ou « conflit avec un paquet existant » | Désinstalle l'ancienne version de Homemade (appui long sur l'icône → Désinstaller), puis réinstalle. |
 | La page GitHub affiche « 404 » | Tu n'es pas connecté à GitHub dans Chrome, ou la première construction n'est pas terminée. |
-| « Analyse indisponible » | Normal avec l'APK : il n'a pas d'IA. Remplis l'annonce à la main. |
+| « IA indisponible · saisie manuelle » | Claude n'est pas encore activé (Étape 0-B). Remplis l'annonce à la main. |
 
 ➡️ Continue ensuite à la **Partie 3 — Utiliser l'app**.
 
@@ -78,18 +120,18 @@ Quand je modifie l'app, une nouvelle version apparaît au même lien (**releases
 ## Partie 3 — Utiliser l'app
 
 ### Créer un compte
-1. **Créer un compte** → prénom, courriel, mot de passe (8 caractères minimum) → coche la case → **Créer mon compte**.
+1. **Créer un compte** → **code d'invitation** (ex. `VOISINS2026`), prénom, courriel, mot de passe (8 caractères minimum) → coche la case → **Créer mon compte**.
 2. **Profil santé** : touche tes allergies (elles deviennent rouges). Pour chacune, choisis *Allergie* ou *Intolérance*.
 3. **Enregistrer et continuer**. Si l'app demande ta position, accepte : elle sert à trouver les plats près de toi.
 
 ### Les 5 onglets du bas
 | Onglet | À quoi il sert |
 |---|---|
-| 🍴 **Découvrir** | Les plats autour de toi. Ceux dangereux pour tes allergies sont **automatiquement cachés**. Le bandeau vert indique combien. |
-| 🗺️ **Carte** | Les plats sur une carte. Bouton ⚙️ pour filtrer : distance, prix, cuisine, régime, achat ou échange. |
-| 📷 **Publier** | Photographier ton plat. L'IA remplit l'annonce pour toi. |
-| 💬 **Messages** | Discuter avec le Cooker ou l'Eater, accepter un échange, confirmer la récupération. |
-| 👤 **Profil** | Tes notes (en tant que Cooker et en tant qu'Eater), ton profil santé, la déconnexion. |
+| 🍴 **Découvrir** | Les plats autour de toi, avec une **barre de recherche** (plat, ingrédient, quartier). Ceux dangereux pour tes allergies sont **automatiquement cachés** ; le bandeau vert indique combien. |
+| 🗺️ **Carte** | Carte interactive (OpenStreetMap) : touche une pastille de prix pour voir le plat. Bouton ☰ pour la liste, ⚙️ pour filtrer, ➤ pour te localiser. |
+| 📷 **Publier** | Photographier ton plat. L'IA remplit l'annonce et peut **lire une étiquette ou une recette**. |
+| 💬 **Messages** | Discuter, accepter un échange, confirmer la récupération. Une pastille rouge indique les messages non lus. |
+| 👤 **Profil** | Notes, profil santé, **Mes plats**, **Mes favoris**, **Invitez vos voisins**, **Paramètres** (photo, quartier, rayon, données), **Aide**, **Donner mon avis**. |
 
 ### Publier un plat avec l'IA
 > Avec l'**APK** (méthode A), l'étape 3 est sautée : le formulaire s'ouvre vide et tu remplis toi-même le titre, les ingrédients et les allergènes.
@@ -102,9 +144,10 @@ Quand je modifie l'app, une nouvelle version apparaît au même lien (**releases
    - un ingrédient avec le badge **« à vérifier »** est incertain ;
    - touche un ingrédient pour modifier ses allergènes, ou 🗑️ pour le supprimer ;
    - ajoute les ingrédients oubliés dans **« Ajouter un ingrédient »** ;
-   - les allergènes avec un **point jaune** ont été proposés par l'IA.
-6. **Mode** : choisis **Échange**. La vente n'est pas encore activée, il faut d'abord configurer Stripe.
-7. Nombre de portions, durée de disponibilité, lieu de cueillette approximatif.
+   - les allergènes avec un **point jaune** ont été proposés par l'IA ;
+   - tu as utilisé une **sauce, un bouillon ou un produit acheté** ? Touche **« Scanner une étiquette ou une recette »** et photographie sa liste d'ingrédients : l'IA ajoute le produit, ses allergènes (« Contient ») et ses traces (« Peut contenir »). Compare avec le texte lu, puis **Ajouter à mon annonce**.
+6. **Mode** : pendant la bêta, les plats s'**échangent** (la vente viendra avec Stripe).
+7. Nombre de portions, durée de disponibilité, puis le **lieu de cueillette** : touche la carte ou glisse l'épingle (ou « Utiliser ma position actuelle »). Le quartier se remplit tout seul ; ton adresse exacte reste privée.
 8. Coche **« J'ai vérifié la liste des ingrédients et des allergènes »** → **Publier le plat**.
 
 > L'IA gratuite est rapide mais peut se tromper : dans nos essais, elle a pris un curry pour une moussaka. **Ta vérification est indispensable.** C'est le principe de l'app : l'IA propose, le cuisinier valide.
@@ -117,6 +160,12 @@ Quand je modifie l'app, une nouvelle version apparaît au même lien (**releases
 5. Après la récupération : **J'ai récupéré** → donne une **note** et un avis.
 6. Les deux avis s'affichent **en même temps**, quand chacun a noté : personne ne voit la note de l'autre avant d'avoir donné la sienne.
 
+### Gérer tes plats, signaler, donner ton avis
+- **Profil → Mes plats** : état de chaque annonce, portions restantes, demandes en cours, bouton **Retirer**.
+- Sur un plat : ♡ pour le mettre en **favori**, ⤴ pour le **partager**, et en bas **« Signaler ce plat »** (une réaction allergique ou un problème d'hygiène retire le plat immédiatement).
+- **Profil → Donner mon avis sur la bêta** : bogue, idée… Tu lis tout dans Supabase (Partie 5).
+- **Paramètres → Obtenir une copie de mes données / Supprimer mon compte** (Loi 25).
+
 ---
 
 ## Partie 4 — Scénario de test complet (environ 15 minutes)
@@ -125,7 +174,7 @@ On ne voit jamais **ses propres** plats dans son fil. Il faut donc **deux compte
 
 | # | Qui | Action | Résultat attendu |
 |---|---|---|---|
-| 1 | Compte **A** | Créer le compte, aucune allergie | Fil vide (normal : aucun plat encore) |
+| 1 | Compte **A** | Créer le compte avec le code `VOISINS2026`, aucune allergie | Fil vide (normal : aucun plat encore) |
 | 2 | A | Publier un plat **avec du fromage ou de la crème**, mode Échange | « Votre plat est en ligne ! » |
 | 3 | A | Profil → **Se déconnecter** | Retour à l'accueil |
 | 4 | Compte **B** | Créer le compte avec l'allergie **Lait** | Le plat de A est **caché**, avec le bandeau « 1 plat masqué pour votre sécurité » ✅ |
@@ -143,6 +192,7 @@ On ne voit jamais **ses propres** plats dans son fil. Il faut donc **deux compte
 1. Va sur **https://supabase.com/dashboard** → ton projet.
 2. Menu de gauche → **Table Editor**.
 3. Tables utiles : `profiles` (comptes), `meals` (plats), `meal_allergens` (allergènes calculés), `orders` (échanges), `messages` (chat), `reviews` (avis).
+4. Pour la bêta : **`beta_feedback`** (commentaires des testeurs), **`reports`** (signalements), **`beta_invites`** (codes et utilisations), `ai_analyses` (analyses IA, colonne `task` = `meal` ou `ocr`).
 
 ---
 
@@ -152,7 +202,10 @@ On ne voit jamais **ses propres** plats dans son fil. Il faut donc **deux compte
 |---|---|
 | Expo Go : « Could not connect » ou le chargement tourne sans fin | PC et téléphone sur **le même Wi-Fi** ? Pare-feu autorisé (Partie 2, étape 5) ? Ferme la fenêtre noire et relance `Lancer-Homemade.bat`. |
 | Le QR code ne s'affiche pas | Agrandis la fenêtre noire, ou attends 30 s de plus. |
-| « Analyse indisponible » | L'IA n'a pas démarré : ouvre **Ollama** depuis le menu Démarrer, puis réessaie. Tu peux aussi remplir l'annonce à la main. |
+| « Analyse indisponible » | Méthode B : l'IA n'a pas démarré, ouvre **Ollama** depuis le menu Démarrer puis réessaie. APK : active Claude (Étape 0-B). Tu peux toujours remplir l'annonce à la main. |
+| « Code d'invitation invalide » | Vérifie l'orthographe (les espaces et minuscules sont acceptés). Le code est peut-être épuisé : crée-en un autre (Étape 0-C). |
+| La carte affiche « n'a pas pu se charger » | Pas d'Internet : la liste par distance s'affiche à la place. Touche l'icône carte pour réessayer. |
+| Les plats sont autour de Montréal alors que tu es ailleurs | Touche le bandeau orange « utiliser votre position » dans Découvrir, ou ➤ sur la carte, et autorise la localisation. |
 | « Attention : IA locale indisponible » dans la fenêtre noire | Même solution : ouvre Ollama, puis relance le `.bat`. |
 | Erreur « STRIPE_ONBOARDING_REQUIRED » | Normal : la vente exige Stripe. Choisis le mode **Échange**. |
 | « Aucun plat pour l'instant » | Normal si personne d'autre n'a publié : fais le scénario de la Partie 4 avec deux comptes. |
@@ -182,7 +235,8 @@ Pour changer : remplace la valeur, enregistre, puis relance `Lancer-Homemade.bat
 |---|---|---|
 | IA Qwen sur ton PC | **0 $** | Pour le développement seulement : ton PC doit rester allumé |
 | Supabase (base de données) | **0 $** (plan Free) | Gratuit tant que l'app est petite |
-| Claude (IA en ligne, Anthropic) | Non utilisé | Quelques cents US par photo, plus rapide et plus précis, fonctionne sans ton PC |
+| Claude (IA en ligne, Anthropic) | Quelques cents US par photo ou étiquette (limite : 20 analyses / h / personne). Pour 30 testeurs, compter quelques dollars par mois | Idem, à surveiller dans la console Anthropic |
+| Carte (OpenStreetMap / CARTO) | **0 $**, aucune clé | Au-delà de ~75 000 affichages / mois, prévoir un fournisseur payant ou un compte CARTO |
 | Stripe (paiements) | Non activé | Mode test gratuit. En réel : environ 2,9 % + 0,30 $ par paiement (à vérifier sur stripe.com/ca/pricing) |
 
 ---
@@ -191,7 +245,6 @@ Pour changer : remplace la valeur, enregistre, puis relance `Lancer-Homemade.bat
 
 - Déplacer la base de données vers un projet Supabase **au Canada** (Loi 25). Aujourd'hui elle est aux États-Unis, ce qui convient pour des tests.
 - **Réactiver la confirmation par courriel** (désactivée pour faciliter les tests).
-- Passer l'IA sur **Claude** (en ligne) pour que l'app fonctionne sans ton PC.
 - Activer **Stripe** pour la vente.
 - Obtenir un **avis juridique** sur la vente de plats faits maison (MAPAQ).
 - Publier sur le Play Store (via EAS Build).

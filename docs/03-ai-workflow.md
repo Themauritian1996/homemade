@@ -73,5 +73,17 @@ Contrôles supplémentaires au moment de la transaction : `create_purchase_order
 - **Jeu d'évaluation** : échantillonner 200 à 300 photos réelles consenties avec leur déclaration validée ; rejouer à chaque changement de `PROMPT_VERSION`, `AI_MODEL` ou `AI_EFFORT` avant déploiement.
 - **Dictionnaire** : les faux négatifs récurrents (ex. « sauce hoisin ») alimentent `ingredients` / `ingredient_allergens` curés — la correction bénéficie immédiatement à tous les plats, IA ou non.
 
+## Lecture d'étiquettes et de recettes (OCR)
+Les allergènes cachés viennent souvent des **produits achetés** (sauce soya, bouillon, chocolat, pesto). Dans l'écran de révision, le bouton **« Scanner une étiquette ou une recette »** photographie la liste d'ingrédients :
+
+1. Photo préparée en **1600 px, JPEG 80 %** (petits caractères lisibles), envoyée à `meal-photos/<uid>/ocr-<horodatage>.jpg`.
+2. `analyze-meal` avec `task: 'ocr'` → Claude transcrit le texte (`OCR_SYSTEM_PROMPT`, schéma `OCR_OUTPUT_SCHEMA`, étiquettes bilingues lues en français et en anglais). En développement, même contrat via Qwen3-VL (`LOCAL_OCR_*`).
+3. `sanitizeOcr()` (fail-closed) : codes valides uniquement ; blé ⇒ gluten ; **lexique bilingue** appliqué aux noms d'ingrédients et aux mentions « Contient » / « Peut contenir » transcrites ; un allergène « contenu » n'est jamais rétrogradé en « trace » ; avertissement si la confiance < 0,6.
+4. Aperçu : texte lu (à comparer avec la photo), ingrédients, « Contient », « Peut contenir ». **Étiquette** = un seul ingrédient (le produit) portant ses allergènes ; **recette** = la liste de ses ingrédients.
+5. Fusion **additive** (`src/lib/scanMerge.ts`) : ingrédients ajoutés ou complétés, allergènes « contenus » hors ingrédients déclarés, traces ajoutées. Rien n'est retiré ; le Cooker révise puis atteste comme d'habitude.
+
+## Disponibilité de l'IA
+L'app interroge une fois `analyze-meal` (`{ ping: true }`) : si la fonction n'est pas déployée ou n'a pas de clé, l'écran Publier l'indique (« IA indisponible · saisie manuelle ») au lieu d'échouer à chaque photo. Une panne en cours d'analyse bascule toujours en saisie manuelle.
+
 ## Coût et performance (ordre de grandeur)
 Une photo de 1280 × 960 représente environ 1 600 jetons d'entrée ; avec le prompt et la réponse (raisonnement inclus), compter quelques milliers de jetons par analyse. Aux tarifs publics de `claude-opus-5` (5 $ / 25 $ US par million de jetons entrée / sortie), l'ordre de grandeur est de **quelques cents par publication**. Leviers à mesurer sur le jeu d'évaluation avant de les activer : `AI_EFFORT=low`, ou un modèle moins coûteux via `AI_MODEL`. Le quota horaire borne l'exposition.

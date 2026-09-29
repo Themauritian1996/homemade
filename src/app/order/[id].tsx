@@ -15,6 +15,7 @@ import { config, DEMO_MODE } from '@/lib/config';
 import { formatPrice } from '@/lib/format';
 import { fetchMeal, fetchMySwappableMeals } from '@/services/meals';
 import { useApp } from '@/store/app';
+import { friendlyError } from '@/lib/errors';
 import { createPurchase, proposeSwap } from '@/services/orders';
 import { colors, fonts, radius, spacing, type } from '@/theme';
 import type { Meal } from '@/types';
@@ -66,7 +67,7 @@ export default function OrderModal() {
       }
       router.replace({ pathname: '/chat/[id]', params: { id: res.conversationId } });
     } catch (e) {
-      Alert.alert('Erreur', e instanceof Error ? e.message : 'Paiement impossible');
+      Alert.alert('Commande impossible', friendlyError(e, 'Paiement impossible.'));
     } finally {
       setLoading(false);
     }
@@ -79,6 +80,8 @@ export default function OrderModal() {
       const res = await proposeSwap(meal.id, offered, note);
       Alert.alert('Proposition envoyée', `${meal.cooker.displayName} recevra votre offre d'échange.`);
       router.replace({ pathname: '/chat/[id]', params: { id: res.conversationId } });
+    } catch (e) {
+      Alert.alert('Proposition impossible', friendlyError(e));
     } finally {
       setLoading(false);
     }

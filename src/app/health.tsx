@@ -1,9 +1,10 @@
 import { router } from 'expo-router';
 import React, { useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { Alert, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HealthEditor } from '@/components/HealthEditor';
 import { Button, IconButton } from '@/components/ui';
+import { friendlyError } from '@/lib/errors';
 import { saveHealthProfile } from '@/services/profile';
 import { useApp } from '@/store/app';
 import { colors, spacing, type } from '@/theme';
@@ -20,6 +21,8 @@ export default function HealthModal() {
       await saveHealthProfile(draft);
       setHealth(draft);
       router.back();
+    } catch (e) {
+      Alert.alert('Profil santé non enregistré', friendlyError(e));
     } finally {
       setSaving(false);
     }

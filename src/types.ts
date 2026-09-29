@@ -98,6 +98,22 @@ export interface AiMealAnalysis {
   modelVersion: string;
 }
 
+/** Lecture d'une étiquette ou d'une recette (OCR IA) — contrat de `analyze-meal` avec `task: 'ocr'`. */
+export interface AiTextScan {
+  source: 'label' | 'recipe' | 'other' | 'none';
+  /** Transcription du texte utile, à comparer avec la photo. */
+  text: string;
+  title: string;
+  ingredients: { name: string; allergens: AllergenCode[] }[];
+  /** Allergènes présents (mentions « Contient » + ingrédients), implications incluses. */
+  contains: AllergenCode[];
+  /** Mentions de précaution (« Peut contenir »). */
+  mayContain: AllergenCode[];
+  confidence: number;
+  warnings: string[];
+  modelVersion: string;
+}
+
 export type OrderKind = 'purchase' | 'swap';
 export type OrderStatus =
   | 'requested'

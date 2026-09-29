@@ -51,14 +51,29 @@ Scanner le QR code avec **Expo Go** (Android) ou l'appareil photo (iOS). Sans va
 6. Tester avec les cartes de test Stripe (ex. `4242 4242 4242 4242`) dans un **build de développement** (voir E).
 
 ## E. Builds natifs (EAS)
-Expo Go suffit pour le mode démo. Pour Stripe, Google Maps en production et les notifications, utiliser un build de développement :
+Expo Go suffit pour le mode démo. Pour Stripe et les notifications, utiliser un build de développement (la carte, elle, fonctionne partout sans clé) :
 ```bash
 npx eas-cli@latest login
 npx eas-cli@latest build --profile development --platform android
 ```
-Pour la production Android, ajouter une clé Google Maps SDK dans `app.json` → `android.config.googleMaps.apiKey`.
+La carte utilise Leaflet + OpenStreetMap (tuiles CARTO) : **aucune clé Google Maps n'est nécessaire**.
 
-## F. Vérifications
+## F. Bêta fermée (invitations)
+1. Appliquer les migrations (dont `20260929000100_beta.sql`) : `npx supabase db push`.
+2. L'inscription exige un code. Code de lancement : **`VOISINS2026`** (100 inscriptions). Chaque membre a ensuite un code personnel de 5 invitations (Profil → Invitez vos voisins).
+3. Gérer les codes depuis **SQL Editor** :
+   ```sql
+   -- nouveau code (lettres majuscules, chiffres, tirets)
+   insert into public.beta_invites (code, note, max_uses) values ('FAMILLE', 'Famille et amis', 20);
+   -- suivi
+   select code, note, uses, max_uses, created_by is not null as personnel from public.beta_invites order by created_at;
+   -- ouvrir les inscriptions à tous (ou 'true' pour refermer)
+   update public.app_config set value = 'false' where key = 'invite_required';
+   ```
+4. Commentaires des testeurs : table `beta_feedback` ; signalements : table `reports`.
+5. Facultatif : variable GitHub `EXPO_PUBLIC_BETA_DOWNLOAD_URL` = lien public de l'APK (ex. Google Drive), ajouté aux invitations partagées.
+
+## G. Vérifications
 ```bash
 npm run typecheck   # TypeScript strict
 npm run test:db     # migrations + scénario de bout en bout sur Postgres/PostGIS (sans Docker)
@@ -70,6 +85,7 @@ npm run test:db     # migrations + scénario de bout en bout sur Postgres/PostGI
 |---|---|---|
 | `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY` | `.env` (app) | Non |
 | `EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY` | `.env` (app) | Non |
+| `EXPO_PUBLIC_AI_PROVIDER` (`server` \| `local` \| `none`), `EXPO_PUBLIC_BETA_DOWNLOAD_URL` | `.env` (app), variables GitHub | Non |
 | `ANTHROPIC_API_KEY`, `AI_MODEL`, `AI_EFFORT`, `AI_MAX_PER_HOUR` | secrets Edge Functions | **Oui** (clé) |
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | secrets Edge Functions | **Oui** |
 | `STRIPE_CONNECT_RETURN_URL`, `STRIPE_CONNECT_REFRESH_URL`, `SERVICE_FEE_RATE`, `PLATFORM_FEE_RATE` | secrets Edge Functions | Non |

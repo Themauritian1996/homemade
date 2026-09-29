@@ -1,6 +1,6 @@
 /**
- * Remplace la carte quand Google Maps n'est pas configuré (APK sans clé) :
- * les mêmes plats filtrés (santé, distance, mode), triés du plus proche au plus loin.
+ * Vue « liste » de l'onglet Carte : les mêmes plats filtrés (santé, distance, mode), du plus proche au plus loin.
+ * Sert aussi de repli si la carte ne peut pas se charger (hors ligne).
  */
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
@@ -13,7 +13,7 @@ import { FilterSheet } from './FilterSheet';
 import { MealCard } from './MealCard';
 import { Chip, EmptyState } from './ui';
 
-export function MapFallback() {
+export function NearbyList({ notice, onShowMap }: { notice?: string; onShowMap?: () => void }) {
   const insets = useSafeAreaInsets();
   const { meals, loading, reload } = useFeed();
   const { filters, setFilters } = useApp();
@@ -37,6 +37,11 @@ export function MapFallback() {
                   {meals.length} repas dans un rayon de {filters.radiusKm} km · du plus proche au plus loin
                 </Text>
               </View>
+              {onShowMap && (
+                <Pressable style={styles.roundBtn} onPress={onShowMap} accessibilityRole="button" accessibilityLabel="Afficher la carte">
+                  <Ionicons name="map-outline" size={20} color={colors.ink} />
+                </Pressable>
+              )}
               <Pressable style={styles.roundBtn} onPress={() => setSheet(true)} accessibilityLabel="Filtres">
                 <Ionicons name="options-outline" size={20} color={colors.ink} />
                 {activeFilterCount(filters) > 0 && <View style={styles.dot} />}
@@ -53,17 +58,19 @@ export function MapFallback() {
                 <Chip key={id} label={label} selected={filters.mode === id} onPress={() => setFilters({ mode: id })} />
               ))}
             </View>
-            <View style={styles.notice}>
-              <Ionicons name="map-outline" size={16} color={colors.forest} />
-              <Text style={[type.caption, { flex: 1, color: colors.forest }]}>
-                La carte interactive sera activée dans une prochaine version. En attendant, voici les plats triés par distance.
-              </Text>
-            </View>
+            {notice && (
+              <View style={styles.notice}>
+                <Ionicons name="cloud-offline-outline" size={16} color={colors.forest} />
+                <Text style={[type.caption, { flex: 1, color: colors.forest }]}>{notice}</Text>
+              </View>
+            )}
           </View>
         }
         renderItem={({ item }) => <MealCard meal={item} variant="compact" />}
         ListEmptyComponent={
-          loading ? null : <EmptyState icon="location-outline" title="Aucun plat à proximité" body="Élargissez le rayon dans les filtres, ou revenez un peu plus tard." />
+          loading ? null : (
+            <EmptyState icon="location-outline" title="Aucun plat à proximité" body="Élargissez le rayon dans les filtres, ou revenez un peu plus tard." />
+          )
         }
       />
       <FilterSheet visible={sheet} value={filters} onClose={() => setSheet(false)} onApply={(f) => setFilters(f)} />

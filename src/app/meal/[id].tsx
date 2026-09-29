@@ -6,7 +6,7 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AllergenList } from '@/components/AllergenPicker';
-import { Avatar, Badge, Button, Divider, RatingPill, Stars } from '@/components/ui';
+import { Avatar, Badge, Button, Divider, EmptyState, RatingPill, ScreenHeader, Stars } from '@/components/ui';
 import { allergenById, cuisineById, DIETS } from '@/data/allergens';
 import { formatDistance, formatPrice, relativeTime, timeLeft } from '@/lib/format';
 import { evaluateMeal } from '@/lib/safety';
@@ -19,15 +19,36 @@ export default function MealDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
   const health = useApp((s) => s.health);
+  const me = useApp((s) => s.user?.id);
+  const isFavorite = useApp((s) => s.favorites.includes(id));
+  const toggleFavorite = useApp((s) => s.toggleFavorite);
   const [meal, setMeal] = useState<Meal | null>(null);
+  const [missing, setMissing] = useState(false);
   const [reviews, setReviews] = useState<Review[]>([]);
 
   useEffect(() => {
-    fetchMeal(id).then((m) => {
-      setMeal(m);
-      if (m) fetchCookerReviews(m.cooker.id).then(setReviews).catch(() => {});
-    });
+    fetchMeal(id)
+      .then((m) => {
+        setMeal(m);
+        setMissing(!m);
+        if (m)
+          fetchCookerReviews(m.cooker.id)
+            .then(setReviews)
+            .catch(() => {});
+      })
+      .catch(() => setMissing(true));
   }, [id]);
+
+  if (missing) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.bg }}>
+        <ScreenHeader title="Plat introuvable" />
+        <EmptyState icon="restaurant-outline" title="Ce plat n'est plus disponible" body="Il a peut-être été retiré par son Cooker ou est arrivé à expiration.">
+          <Button title="Voir les autres plats" onPress={() => router.replace('/')} style={{ marginTop: spacing.md }} />
+        </EmptyState>
+      </View>
+    );
+  }
 
   if (!meal) {
     return (
@@ -41,6 +62,9 @@ export default function MealDetail() {
   const verdict = evaluateMeal(meal, health);
   const cuisine = cuisineById(meal.cuisine);
   const blocked = verdict.conflicts.length > 0 || verdict.traceConflicts.length > 0;
+  const mine = meal.cooker.id === me;
+  const share = () =>
+    Share.share({ message: `${meal.title} · ${formatPrice(meal.priceCents)} sur Homemade 🍽️\nOuvrir dans l'app : homemade://meal/${meal.id}` }).catch(() => {});
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -49,16 +73,24 @@ export default function MealDetail() {
           <Image source={{ uri: meal.photos[0] }} style={styles.hero} contentFit="cover" transition={300} />
           <LinearGradient colors={['rgba(0,0,0,0.45)', 'transparent']} style={[StyleSheet.absoluteFill, { height: 140 }]} />
           <View style={[styles.heroBar, { top: insets.top + spacing.sm }]}>
-            <Pressable style={styles.heroBtn} onPress={() => router.back()} accessibilityLabel="Retour">
+            <Pressable style={styles.heroBtn} onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} accessibilityLabel="Retour">
               <Ionicons name="chevron-back" size={20} color={colors.ink} />
             </Pressable>
             <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-              <Pressable style={styles.heroBtn} onPress={() => Share.share({ message: `${meal.title} sur Homemade 🍽️` })} accessibilityLabel="Partager">
+              <Pressable style={styles.heroBtn} onPress={share} accessibilityLabel="Partager">
                 <Ionicons name="share-outline" size={19} color={colors.ink} />
               </Pressable>
-              <Pressable style={styles.heroBtn} accessibilityLabel="Favori">
-                <Ionicons name="heart-outline" size={19} color={colors.ink} />
-              </Pressable>
+              {!mine && (
+                <Pressable
+                  style={styles.heroBtn}
+                  onPress={() => toggleFavorite(meal.id)}
+                  accessibilityRole="button"
+                  accessibilityLabel={isFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+                  accessibilityState={{ selected: isFavorite }}
+                >
+                  <Ionicons name={isFavorite ? 'heart' : 'heart-outline'} size={19} color={isFavorite ? colors.tomato : colors.ink} />
+                </Pressable>
+              )}
             </View>
           </View>
         </View>
@@ -152,6 +184,17 @@ export default function MealDetail() {
               </View>
             ))}
           </View>
+
+          {!mine && (
+            <Pressable
+              onPress={() => router.push({ pathname: '/report', params: { mealId: meal.id, subjectId: meal.cooker.id, title: meal.title } })}
+              style={styles.report}
+              accessibilityRole="button"
+            >
+              <Ionicons name="flag-outline" size={16} color={colors.muted} />
+              <Text style={type.caption}>Signaler ce plat ou un problème</Text>
+            </Pressable>
+          )}
         </View>
       </ScrollView>
 
@@ -164,21 +207,31 @@ export default function MealDetail() {
             {meal.priceCents != null ? 'par portion' : 'contre un de vos plats'}
           </Text>
         </View>
-        <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-          {meal.mode !== 'sale' && (
-            <Button
-              title="Échanger"
-              variant={meal.mode === 'swap' ? 'primary' : 'secondary'}
-              icon="swap-horizontal"
-              size="md"
-              disabled={blocked}
-              onPress={() => router.push({ pathname: '/order/[id]', params: { id: meal.id, kind: 'swap' } })}
-            />
-          )}
-          {meal.mode !== 'swap' && (
-            <Button title="Commander" variant="accent" size="md" disabled={blocked} onPress={() => router.push({ pathname: '/order/[id]', params: { id: meal.id, kind: 'purchase' } })} />
-          )}
-        </View>
+        {mine ? (
+          <Button title="Gérer mes plats" size="md" icon="storefront-outline" onPress={() => router.push('/my-meals')} />
+        ) : (
+          <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+            {meal.mode !== 'sale' && (
+              <Button
+                title="Échanger"
+                variant={meal.mode === 'swap' ? 'primary' : 'secondary'}
+                icon="swap-horizontal"
+                size="md"
+                disabled={blocked}
+                onPress={() => router.push({ pathname: '/order/[id]', params: { id: meal.id, kind: 'swap' } })}
+              />
+            )}
+            {meal.mode !== 'swap' && (
+              <Button
+                title="Commander"
+                variant="accent"
+                size="md"
+                disabled={blocked}
+                onPress={() => router.push({ pathname: '/order/[id]', params: { id: meal.id, kind: 'purchase' } })}
+              />
+            )}
+          </View>
+        )}
       </View>
     </View>
   );
@@ -200,8 +253,25 @@ const styles = StyleSheet.create({
   sheet: { marginTop: -28, backgroundColor: colors.bg, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: spacing.xl, gap: spacing.lg },
   metaRow: { flexDirection: 'row', gap: spacing.lg, flexWrap: 'wrap' },
   safety: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderRadius: radius.md },
-  cooker: { flexDirection: 'row', gap: spacing.md, alignItems: 'center', backgroundColor: colors.surface, padding: spacing.lg, borderRadius: radius.lg, ...shadow.card },
-  pickup: { flexDirection: 'row', gap: spacing.md, backgroundColor: colors.surface, padding: spacing.lg, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border },
+  cooker: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    padding: spacing.lg,
+    borderRadius: radius.lg,
+    ...shadow.card,
+  },
+  report: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, paddingVertical: spacing.md, minHeight: 44 },
+  pickup: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    backgroundColor: colors.surface,
+    padding: spacing.lg,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
   footer: {
     position: 'absolute',
     left: 0,

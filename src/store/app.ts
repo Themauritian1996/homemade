@@ -18,35 +18,50 @@ interface AppState {
   filters: FeedFilters;
   location: GeoPoint;
   hasRealLocation: boolean;
+  /** Plats mis de côté (❤︎) sur ce téléphone. */
+  favorites: string[];
+  /** Messages non lus (toutes conversations) : pastille de l'onglet Messages. Non persisté. */
+  unread: number;
+  setUnread: (n: number) => void;
   setUser: (u: SessionUser | null) => void;
   setOnboarded: (v: boolean) => void;
   setHealth: (h: HealthProfile) => void;
   setFilters: (f: Partial<FeedFilters>) => void;
   resetFilters: () => void;
   setLocation: (p: GeoPoint, real: boolean) => void;
+  toggleFavorite: (mealId: string) => void;
+  /** Déconnexion : rien du compte précédent ne doit fuiter vers le suivant (profil santé, onboarding, favoris). */
+  resetSession: () => void;
 }
+
+const EMPTY_HEALTH: HealthProfile = { allergens: [], diets: [], strictTraces: false };
 
 export const useApp = create<AppState>()(
   persist(
     (set) => ({
       user: null,
       onboarded: false,
-      health: { allergens: [], diets: [], strictTraces: false },
+      health: EMPTY_HEALTH,
       filters: DEFAULT_FILTERS,
       location: { latitude: config.defaultRegion.latitude, longitude: config.defaultRegion.longitude },
       hasRealLocation: false,
+      favorites: [],
+      unread: 0,
+      setUnread: (unread) => set({ unread }),
       setUser: (user) => set({ user }),
       setOnboarded: (onboarded) => set({ onboarded }),
       setHealth: (health) => set({ health }),
       setFilters: (f) => set((s) => ({ filters: { ...s.filters, ...f } })),
       resetFilters: () => set({ filters: DEFAULT_FILTERS }),
       setLocation: (location, hasRealLocation) => set({ location, hasRealLocation }),
+      toggleFavorite: (id) => set((s) => ({ favorites: s.favorites.includes(id) ? s.favorites.filter((x) => x !== id) : [id, ...s.favorites].slice(0, 100) })),
+      resetSession: () => set({ user: null, onboarded: false, health: EMPTY_HEALTH, favorites: [], unread: 0 }),
     }),
     {
       name: 'homemade-app',
       storage: createJSONStorage(() => AsyncStorage),
       // La session Supabase est gérée par supabase-js ; on ne persiste ici que les préférences locales.
-      partialize: (s) => ({ onboarded: s.onboarded, health: s.health, filters: s.filters, user: s.user }),
+      partialize: (s) => ({ onboarded: s.onboarded, health: s.health, filters: s.filters, user: s.user, favorites: s.favorites }),
     },
   ),
 );

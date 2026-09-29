@@ -4,7 +4,6 @@ const path = require('path');
 
 const config = getDefaultConfig(__dirname);
 const webStubs = {
-  'react-native-maps': path.resolve(__dirname, 'src/web-stubs/react-native-maps.tsx'),
   '@stripe/stripe-react-native': path.resolve(__dirname, 'src/web-stubs/stripe.tsx'),
 };
 

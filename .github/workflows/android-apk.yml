@@ -29,10 +29,13 @@ jobs:
       EXPO_PUBLIC_SUPABASE_URL: ${{ vars.EXPO_PUBLIC_SUPABASE_URL }}
       EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
       EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ vars.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
-      # L'IA locale (Ollama) n'existe que sur le PC de développement : l'APK utilise `server` (Claude) ou `none`.
-      EXPO_PUBLIC_AI_PROVIDER: ${{ vars.EXPO_PUBLIC_AI_PROVIDER || 'none' }}
-      # Facultatif : clé Google Maps Android (sinon l'onglet Carte affiche une liste par distance).
-      GOOGLE_MAPS_ANDROID_API_KEY: ${{ secrets.GOOGLE_MAPS_ANDROID_API_KEY }}
+      # L'IA locale (Ollama) n'existe que sur le PC de développement : l'APK utilise Claude via l'Edge Function
+      # `analyze-meal` (photo du plat + lecture d'étiquettes). Si la fonction n'est pas déployée, l'app le détecte
+      # et passe en saisie manuelle. Mettre la variable à `none` pour désactiver l'IA.
+      EXPO_PUBLIC_AI_PROVIDER: ${{ vars.EXPO_PUBLIC_AI_PROVIDER || 'server' }}
+      # Facultatif : lien PUBLIC de téléchargement de l'APK (ex. Google Drive), ajouté aux invitations partagées.
+      EXPO_PUBLIC_BETA_DOWNLOAD_URL: ${{ vars.EXPO_PUBLIC_BETA_DOWNLOAD_URL }}
+      # La carte (Leaflet + OpenStreetMap) ne demande aucune clé.
       NODE_OPTIONS: --max-old-space-size=4096
     steps:
       - uses: actions/checkout@v4

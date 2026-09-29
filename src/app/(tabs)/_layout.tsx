@@ -2,7 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import React from 'react';
 import { ColorValue, Platform, StyleSheet, View } from 'react-native';
-import { DEMO_MODE } from '@/lib/config';
+import { useSessionSync } from '@/lib/useSessionSync';
+import { useApp } from '@/store/app';
 import { colors, fonts, shadow } from '@/theme';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -12,6 +13,8 @@ const icon =
   ({ focused, color }: { focused: boolean; color: ColorValue }) => <Ionicons name={focused ? active : inactive} size={23} color={color} />;
 
 export default function TabsLayout() {
+  useSessionSync();
+  const unread = useApp((s) => s.unread);
   return (
     <Tabs
       screenOptions={{
@@ -43,7 +46,15 @@ export default function TabsLayout() {
           tabBarLabelStyle: { fontFamily: fonts.semibold, fontSize: 11, color: colors.tomato },
         }}
       />
-      <Tabs.Screen name="inbox" options={{ title: 'Messages', tabBarIcon: icon('chatbubbles', 'chatbubbles-outline'), tabBarBadge: DEMO_MODE ? 1 : undefined, tabBarBadgeStyle: { backgroundColor: colors.tomato } }} />
+      <Tabs.Screen
+        name="inbox"
+        options={{
+          title: 'Messages',
+          tabBarIcon: icon('chatbubbles', 'chatbubbles-outline'),
+          tabBarBadge: unread > 0 ? (unread > 9 ? '9+' : unread) : undefined,
+          tabBarBadgeStyle: { backgroundColor: colors.tomato },
+        }}
+      />
       <Tabs.Screen name="profile" options={{ title: 'Profil', tabBarIcon: icon('person-circle', 'person-circle-outline') }} />
     </Tabs>
   );
