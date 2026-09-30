@@ -86,11 +86,24 @@ export function toGeminiSchema(s: any): any {
   return out;
 }
 
+/** Google indique le remplaçant d'un modèle retiré (« Please update your code to use models/xxx ») : on le suit. */
+export function suggestedModel(message: string): string | null {
+  return message.match(/use models\/([A-Za-z0-9._-]+)/)?.[1] ?? null;
+}
+
 async function callGemini(cfg: ProviderConfig, req: VisionRequest): Promise<VisionResult> {
-  let last: ProviderError | null = null;
-  for (const model of cfg.models) {
-    // 1er essai : sortie contrainte par le schéma ; si le modèle refuse le schéma (400), JSON libre + nettoyage serveur.
-    for (const withSchema of [true, false]) {
+  const errors: string[] = [];
+  let status = 500;
+  const queue = [...cfg.models];
+  const tried = new Set<string>();
+  while (queue.length) {
+    const model = queue.shift()!;
+    if (tried.has(model)) continue;
+    tried.add(model);
+    // Essais pour ce modèle : schéma imposé, puis JSON libre si le schéma est refusé ; une reprise si Google est surchargé.
+    let withSchema = true;
+    let retried = false;
+    for (;;) {
       const r = await post(
         `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
         { 'x-goog-api-key': cfg.apiKey ?? '' },
@@ -107,7 +120,10 @@ async function callGemini(cfg: ProviderConfig, req: VisionRequest): Promise<Visi
       if (r.status === 200) {
         const cand = r.json?.candidates?.[0];
         const text = (cand?.content?.parts ?? []).map((p: { text?: string }) => p.text ?? '').join('');
-        if (!text) throw new ProviderError('gemini', 422, `réponse vide (${cand?.finishReason ?? r.json?.promptFeedback?.blockReason ?? 'inconnue'})`);
+        if (!text) {
+          errors.push(`${model} réponse vide (${cand?.finishReason ?? r.json?.promptFeedback?.blockReason ?? 'inconnue'})`);
+          break;
+        }
         return {
           text,
           provider: 'gemini',
@@ -115,14 +131,28 @@ async function callGemini(cfg: ProviderConfig, req: VisionRequest): Promise<Visi
           usage: { input_tokens: r.json?.usageMetadata?.promptTokenCount, output_tokens: r.json?.usageMetadata?.candidatesTokenCount },
         };
       }
-      last = new ProviderError('gemini', r.status, errorMessage(r));
-      if (r.status === 400 && withSchema && !/API key/i.test(errorMessage(r))) continue; // schéma refusé : essai sans schéma
-      break; // autre erreur : modèle suivant
+      const msg = errorMessage(r);
+      status = r.status;
+      errors.push(`${model} ${r.status} ${msg.slice(0, 160)}`);
+      // Clé invalide : inutile d'essayer d'autres modèles.
+      if (r.status === 401 || r.status === 403 || /API key/i.test(msg)) throw new ProviderError('gemini', r.status, errors.join(' ; '));
+      if (r.status === 400 && withSchema) {
+        withSchema = false; // schéma refusé : essai sans schéma
+        continue;
+      }
+      if ((r.status === 500 || r.status === 503) && !retried) {
+        retried = true; // surcharge passagère : une reprise après une courte pause
+        await new Promise((ok) => setTimeout(ok, 1500));
+        continue;
+      }
+      if (r.status === 404) {
+        const next = suggestedModel(msg);
+        if (next && !tried.has(next)) queue.unshift(next); // modèle retiré : on suit le remplaçant indiqué par Google
+      }
+      break; // 429 (quota de ce modèle), 404, autre : modèle suivant
     }
-    // Clé invalide : inutile d'essayer d'autres modèles. (404 modèle retiré, 429 quota du modèle : on essaie le suivant.)
-    if (last && (last.status === 401 || last.status === 403 || /API key/i.test(last.message))) throw last;
   }
-  throw last ?? new ProviderError('gemini', 500, 'aucun modèle');
+  throw new ProviderError('gemini', status, errors.join(' ; ') || 'aucun modèle');
 }
 
 // ─────────────────────────────────────────────── API compatibles OpenAI (Groq, OpenRouter, Ollama…)
@@ -182,13 +212,19 @@ async function callOpenAiCompatible(cfg: ProviderConfig, req: VisionRequest): Pr
 
 // ─────────────────────────────────────────────── Configuration & chaîne de repli
 
+/**
+ * Modèles Gemini essayés dans l'ordre. Les alias « -latest » suivent les nouvelles versions de Google ;
+ * les versions « lite » ont un quota gratuit séparé et plus large (repli si le quota du modèle principal est atteint).
+ */
+export const GEMINI_DEFAULT_MODELS = ['gemini-flash-latest', 'gemini-flash-lite-latest', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'];
+
 const list = (v: string | undefined) => (v ?? '').split(',').map((s) => s.trim()).filter(Boolean);
 
 /** Fournisseurs utilisables d'après les secrets présents, dans l'ordre de `AI_PROVIDERS` (défaut : gemini, groq, custom). */
 export function configuredProviders(env: (name: string) => string | undefined): ProviderConfig[] {
   const all: Record<string, ProviderConfig | null> = {
     gemini: env('GEMINI_API_KEY')
-      ? { name: 'gemini', apiKey: env('GEMINI_API_KEY'), models: [...new Set([...list(env('GEMINI_MODEL')), 'gemini-flash-latest', 'gemini-2.5-flash', 'gemini-2.0-flash'])] }
+      ? { name: 'gemini', apiKey: env('GEMINI_API_KEY'), models: [...new Set([...list(env('GEMINI_MODEL')), ...GEMINI_DEFAULT_MODELS])] }
       : null,
     groq: env('GROQ_API_KEY')
       ? { name: 'groq', apiKey: env('GROQ_API_KEY'), models: [...new Set([...list(env('GROQ_MODEL')), 'meta-llama/llama-4-scout-17b-16e-instruct', 'meta-llama/llama-4-maverick-17b-128e-instruct'])] }

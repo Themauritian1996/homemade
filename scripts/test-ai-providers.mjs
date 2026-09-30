@@ -49,7 +49,24 @@ check('Gemini : schéma refusé ⇒ JSON libre', r.provider === 'gemini' && call
 // Modèle retiré ⇒ modèle suivant
 mock((url) => (url.includes('gemini-flash-latest') ? [404, { error: { message: 'models/gemini-flash-latest is not found' } }] : [200, gemini(answer)]));
 r = await analyzeWithFreeProviders(both, req);
-check('Gemini : modèle introuvable ⇒ modèle suivant', r.provider === 'gemini' && calls[1].url.includes('gemini-2.5-flash'));
+check('Gemini : modèle introuvable ⇒ modèle suivant', r.provider === 'gemini' && calls[1].url.includes('gemini-flash-lite-latest'));
+
+// Modèle retiré avec remplaçant indiqué par Google ⇒ on le suit
+mock((url) =>
+  url.includes('gemini-9-flash') ? [200, gemini(answer)] : [404, { error: { message: 'This model models/gemini-flash-latest is no longer available. Please update your code to use models/gemini-9-flash for the latest features.' } }],
+);
+r = await analyzeWithFreeProviders(both, req);
+check('Gemini : remplaçant recommandé par Google suivi automatiquement', r.provider === 'gemini' && calls[1].url.includes('gemini-9-flash'), calls.map((c) => c.url.split('/models/')[1]).join(' → '));
+
+// Surcharge passagère ⇒ une reprise du même modèle
+mock((url, body, n) => (n === 1 ? [503, { error: { message: 'The model is overloaded.' } }] : [200, gemini(answer)]));
+r = await analyzeWithFreeProviders(both, req);
+check('Gemini : surcharge (503) ⇒ nouvel essai du même modèle', r.provider === 'gemini' && calls.length === 2 && calls[1].url === calls[0].url);
+
+// Quota du modèle principal ⇒ version lite (quota séparé)
+mock((url) => (url.includes('/gemini-flash-latest:') ? [429, { error: { message: 'Quota exceeded' } }] : [200, gemini(answer)]));
+r = await analyzeWithFreeProviders(both, req);
+check('Gemini : quota atteint ⇒ modèle lite', r.provider === 'gemini' && calls[1].url.includes('gemini-flash-lite-latest'));
 
 // Quota Gemini épuisé partout ⇒ Groq
 mock((url, body) => (url.includes('googleapis') ? [429, { error: { message: 'Resource has been exhausted (e.g. check quota).' } }] : [200, { model: 'llama', choices: [{ message: { content: '```json\n' + answer + '\n```' } }], usage: { prompt_tokens: 7 } }]));
@@ -67,6 +84,12 @@ try {
   const geminiCalls = calls.filter((c) => c.url.includes('googleapis')).length;
   check('clé invalide ⇒ un seul appel Gemini', geminiCalls === 1, `${geminiCalls} appel(s)`);
   check('tout en panne ⇒ erreur (saisie manuelle)', /gemini 400/.test(e.message) && /groq 500/.test(e.message), e.message.slice(0, 120));
+}
+mock(() => [404, { error: { message: 'not found' } }]);
+try {
+  await analyzeWithFreeProviders([both[0]], req);
+} catch (e) {
+  check('toutes les erreurs Gemini sont conservées (pas seulement la dernière)', (e.message.match(/404/g) ?? []).length >= 4, e.message.slice(0, 160));
 }
 
 check('extractJson : texte autour du JSON', extractJson('Voici : {"a":1} merci') === '{"a":1}');
