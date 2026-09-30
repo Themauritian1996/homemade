@@ -8,9 +8,19 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths-ignore:
-      - 'docs/**'
-      - '**/*.md'
+    # Uniquement quand l'app change (le dernier motif qui correspond l'emporte) : les changements du serveur seul
+    # (migrations, fonctions, robot serveur) ne refabriquent pas l'APK. prompt.ts est partagé avec l'IA locale de l'app.
+    paths:
+      - '**'
+      - '!docs/**'
+      - '!**/*.md'
+      - '!supabase/**'
+      - 'supabase/functions/analyze-meal/prompt.ts'
+      - '!scripts/supabase-deploy.mjs'
+      - '!scripts/test-*.mjs'
+      - '!scripts/bench-local-ai.mjs'
+      - '!scripts/fixtures/**'
+      - '!.github/workflows/supabase-deploy.yml'
 
 permissions:
   contents: write # nécessaire pour créer la Release qui héberge l'APK
