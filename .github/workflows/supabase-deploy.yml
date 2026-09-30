@@ -12,6 +12,15 @@ name: Serveur Supabase
 
 on:
   workflow_dispatch:
+    inputs:
+      project_ref:
+        description: "Identifiant du projet Supabase (laisser vide = celui de l'app, variable EXPO_PUBLIC_SUPABASE_URL)"
+        required: false
+        default: ''
+      dry_run:
+        description: 'Diagnostic seulement (ne rien modifier)'
+        type: boolean
+        default: false
   push:
     branches: [main]
     paths:
@@ -53,7 +62,8 @@ jobs:
             echo "::error::Configuration manquante :$missing — voir GUIDE-UTILISATION.md, Étape 2."
             exit 1
           fi
-          ref=$(echo "$SUPABASE_URL_VAR" | sed -E 's#^https?://([^.]+)\.supabase\.co.*#\1#')
+          ref="${{ inputs.project_ref }}"
+          [ -n "$ref" ] || ref=$(echo "$SUPABASE_URL_VAR" | sed -E 's#^https?://([^.]+)\.supabase\.co.*#\1#')
           echo "ref=$ref" >> "$GITHUB_OUTPUT"
           echo "Projet Supabase : $ref"
           [ -n "$GEMINI_API_KEY$GROQ_API_KEY$AI_CUSTOM_URL" ] || echo "::warning::Aucune clé d'IA gratuite (GEMINI_API_KEY…) : l'app fonctionnera en saisie manuelle."
@@ -92,11 +102,17 @@ jobs:
       - name: Liaison au projet
         run: supabase link --project-ref "${{ steps.cfg.outputs.ref }}"
 
+      - name: État des migrations (déjà appliquées ou non)
+        run: supabase migration list
+
       - name: Base de données (nouvelles migrations seulement)
+        if: ${{ !inputs.dry_run }}
         # « y » répond à la confirmation de la CLI (aucune donnée n'est effacée : migrations additives).
-        run: echo y | supabase db push
+        # Le seed (référentiels) est idempotent : sans effet s'il est déjà appliqué, indispensable sur un projet neuf.
+        run: echo y | supabase db push --include-seed
 
       - name: Clés d'IA (secrets serveur, jamais dans l'app)
+        if: ${{ !inputs.dry_run }}
         run: |
           args=()
           for name in GEMINI_API_KEY GROQ_API_KEY AI_CUSTOM_URL AI_CUSTOM_MODEL AI_CUSTOM_KEY; do
@@ -110,4 +126,5 @@ jobs:
           fi
 
       - name: Fonction d'analyse IA
+        if: ${{ !inputs.dry_run }}
         run: supabase functions deploy analyze-meal --project-ref "${{ steps.cfg.outputs.ref }}"
