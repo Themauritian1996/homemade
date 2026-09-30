@@ -11,7 +11,6 @@ on:
     paths-ignore:
       - 'docs/**'
       - '**/*.md'
-      - 'scripts/**'
 
 permissions:
   contents: write # nécessaire pour créer la Release qui héberge l'APK
@@ -26,8 +25,7 @@ jobs:
     timeout-minutes: 60
     env:
       # Valeurs PUBLIQUES (embarquées dans l'app) : Settings → Secrets and variables → Actions → Variables.
-      EXPO_PUBLIC_SUPABASE_URL: ${{ vars.EXPO_PUBLIC_SUPABASE_URL }}
-      EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+      # URL et clé PUBLIQUE Supabase : lues automatiquement sur le projet (étape « Adresse du serveur »).
       EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ vars.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
       # L'IA locale (Ollama) n'existe que sur le PC de développement : l'APK utilise Claude via l'Edge Function
       # `analyze-meal` (photo du plat + lecture d'étiquettes). Si la fonction n'est pas déployée, l'app le détecte
@@ -55,6 +53,23 @@ jobs:
 
       - name: Dépendances
         run: npm ci
+
+      # Même projet que le robot « Serveur Supabase » : l'app et le serveur ne peuvent pas diverger.
+      # Sans jeton, on garde les anciennes variables EXPO_PUBLIC_SUPABASE_URL / _ANON_KEY.
+      - name: Adresse du serveur (projet Supabase)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF || 'lcpoxseqtabauemymlss' }}
+          FALLBACK_URL: ${{ vars.EXPO_PUBLIC_SUPABASE_URL }}
+          FALLBACK_KEY: ${{ vars.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+        run: |
+          if [ -n "$SUPABASE_ACCESS_TOKEN" ]; then
+            node scripts/supabase-deploy.mjs app-config
+          else
+            echo "::warning::Secret SUPABASE_ACCESS_TOKEN absent : utilisation des variables EXPO_PUBLIC_SUPABASE_URL / _ANON_KEY."
+            echo "EXPO_PUBLIC_SUPABASE_URL=$FALLBACK_URL" >> "$GITHUB_ENV"
+            echo "EXPO_PUBLIC_SUPABASE_ANON_KEY=$FALLBACK_KEY" >> "$GITHUB_ENV"
+          fi
 
       - name: Vérification TypeScript
         run: npx tsc --noEmit
