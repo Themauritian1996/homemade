@@ -58,6 +58,37 @@ jobs:
           echo "Projet Supabase : $ref"
           [ -n "$GEMINI_API_KEY$GROQ_API_KEY$AI_CUSTOM_URL" ] || echo "::warning::Aucune clé d'IA gratuite (GEMINI_API_KEY…) : l'app fonctionnera en saisie manuelle."
 
+      - name: Vérification du jeton Supabase (diagnostic, n'affiche aucune clé)
+        env:
+          REF: ${{ steps.cfg.outputs.ref }}
+        run: |
+          code=$(curl -sS -o projects.json -w '%{http_code}' -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" https://api.supabase.com/v1/projects)
+          echo "Réponse de Supabase à la liste des projets : HTTP $code"
+          if [ "$code" = "401" ]; then
+            echo "::error::Le jeton SUPABASE_ACCESS_TOKEN est invalide ou expiré. Recrée-le sur supabase.com/dashboard/account/tokens."
+            exit 1
+          fi
+          if [ "$code" != "200" ]; then
+            echo "Détail : $(head -c 300 projects.json)"
+            echo "::error::Ce jeton n'a pas le droit de lister les projets (HTTP $code). Recrée-le avec tous les droits (voir le guide)."
+            exit 1
+          fi
+          echo "Projets visibles avec ce jeton :"
+          jq -r '.[] | "  - \(.name)  (identifiant \(.id), statut \(.status), organisation \(.organization_id))"' projects.json
+          if ! jq -e --arg ref "$REF" 'any(.[]; .id == $ref)' projects.json > /dev/null; then
+            echo "::error::Le projet $REF n'est PAS visible avec ce jeton : il a été créé depuis un autre compte Supabase. Connecte-toi au compte qui possède le projet Homemade, recrée le jeton, puis remplace le secret SUPABASE_ACCESS_TOKEN."
+            exit 1
+          fi
+          code=$(curl -sS -o project.json -w '%{http_code}' -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" "https://api.supabase.com/v1/projects/$REF")
+          echo "Accès au projet $REF : HTTP $code — $(jq -r '.status // .message // empty' project.json 2>/dev/null | head -c 200)"
+          code_org=$(curl -sS -o orgs.json -w '%{http_code}' -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" https://api.supabase.com/v1/organizations)
+          echo "Organisations visibles (HTTP $code_org) :"
+          jq -r '.[]? | "  - \(.name) (\(.id))"' orgs.json 2>/dev/null || true
+          for path in secrets functions api-keys; do
+            c=$(curl -sS -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" "https://api.supabase.com/v1/projects/$REF/$path")
+            echo "Droit « $path » : HTTP $c"
+          done
+
       - name: Liaison au projet
         run: supabase link --project-ref "${{ steps.cfg.outputs.ref }}"
 
