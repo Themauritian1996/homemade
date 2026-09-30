@@ -1,45 +1,43 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
-import React, { useEffect, useRef, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
-import MapView, { Circle, Marker } from 'react-native-maps';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, FlatList, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FilterSheet } from '@/components/FilterSheet';
-import { MapFallback } from '@/components/MapFallback';
+import { LeafletMap, LeafletMapHandle } from '@/components/LeafletMap';
 import { MealCard } from '@/components/MealCard';
-import { Chip } from '@/components/ui';
-import { mapsAvailable } from '@/lib/capabilities';
+import { NearbyList } from '@/components/NearbyList';
+import { Button, Chip } from '@/components/ui';
 import { formatPrice } from '@/lib/format';
 import { useFeed } from '@/lib/useFeed';
 import { activeFilterCount, useApp } from '@/store/app';
-import { colors, fonts, radius, shadow, spacing } from '@/theme';
+import { colors, fonts, radius, shadow, spacing, type } from '@/theme';
 import type { Meal } from '@/types';
 
-/** Style Google Maps (Android) sobre et chaud, assorti au design system. */
-const MAP_STYLE = [
-  { elementType: 'geometry', stylers: [{ color: '#F5F1EA' }] },
-  { elementType: 'labels.text.fill', stylers: [{ color: '#6F6A60' }] },
-  { elementType: 'labels.text.stroke', stylers: [{ color: '#F5F1EA' }] },
-  { featureType: 'poi', stylers: [{ visibility: 'off' }] },
-  { featureType: 'poi.park', elementType: 'geometry', stylers: [{ visibility: 'on' }, { color: '#DCE7DF' }] },
-  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#FFFFFF' }] },
-  { featureType: 'road.arterial', elementType: 'geometry', stylers: [{ color: '#FBF8F3' }] },
-  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#EFE6D8' }] },
-  { featureType: 'transit', stylers: [{ visibility: 'off' }] },
-  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#CFE0E8' }] },
-];
-
 export default function MapScreen() {
-  return mapsAvailable() ? <GoogleMapScreen /> : <MapFallback />;
+  const [view, setView] = useState<'map' | 'list'>('map');
+  const [mapError, setMapError] = useState(false);
+  if (view === 'list' || mapError) {
+    return (
+      <NearbyList
+        notice={mapError ? 'La carte n’a pas pu se charger (connexion ?). Voici les plats triés par distance.' : undefined}
+        onShowMap={() => {
+          setMapError(false);
+          setView('map');
+        }}
+      />
+    );
+  }
+  return <InteractiveMap onShowList={() => setView('list')} onError={() => setMapError(true)} />;
 }
 
-function GoogleMapScreen() {
+function InteractiveMap({ onShowList, onError }: { onShowList: () => void; onError: () => void }) {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const mapRef = useRef<MapView>(null);
+  const mapRef = useRef<LeafletMapHandle>(null);
   const listRef = useRef<FlatList<Meal>>(null);
-  const { meals } = useFeed();
-  const { filters, setFilters, location, setLocation } = useApp();
+  const { meals, loading } = useFeed();
+  const { filters, setFilters, location, hasRealLocation, setLocation } = useApp();
   const [selected, setSelected] = useState<string | null>(null);
   const [sheet, setSheet] = useState(false);
   const cardWidth = width - spacing.xl * 2;
@@ -48,60 +46,85 @@ function GoogleMapScreen() {
     if (meals.length && !meals.find((m) => m.id === selected)) setSelected(meals[0].id);
   }, [meals, selected]);
 
-  const focus = (meal: Meal, index: number) => {
-    setSelected(meal.id);
+  // À chaque nouveau résultat (filtres, position), la carte se cadre sur les plats et sur vous.
+  const resultKey = meals.map((m) => m.id).join(',');
+  useEffect(() => {
+    if (loading || !meals.length) return;
+    const points = [...meals.map((m) => m.pickupLocation), ...(hasRealLocation ? [location] : [])];
+    // Petit délai : la carte doit avoir reçu ses marqueurs.
+    const t = setTimeout(() => mapRef.current?.fit(points, { top: insets.top + 130, bottom: 190 }), 300);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resultKey, loading]);
+
+  const markers = useMemo(
+    () =>
+      meals.map((m) => ({
+        id: m.id,
+        latitude: m.pickupLocation.latitude,
+        longitude: m.pickupLocation.longitude,
+        label: formatPrice(m.priceCents),
+        swap: m.mode !== 'sale',
+      })),
+    [meals],
+  );
+
+  const select = (id: string) => {
+    const index = meals.findIndex((m) => m.id === id);
+    if (index < 0) return;
+    setSelected(id);
     listRef.current?.scrollToIndex({ index, animated: true });
-    mapRef.current?.animateToRegion({ ...meal.pickupLocation, latitudeDelta: 0.025, longitudeDelta: 0.025 }, 350);
+    mapRef.current?.flyTo(meals[index].pickupLocation, 15);
   };
 
   const recenter = async () => {
     const { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== 'granted') return;
-    const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-    const p = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
-    setLocation(p, true);
-    mapRef.current?.animateToRegion({ ...p, latitudeDelta: 0.05, longitudeDelta: 0.05 }, 400);
+    if (status !== 'granted') {
+      Alert.alert('Position désactivée', 'Autorisez la localisation dans les réglages du téléphone pour voir les plats autour de vous.');
+      return;
+    }
+    try {
+      const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      const p = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+      setLocation(p, true);
+      mapRef.current?.flyTo(p, 14);
+    } catch {
+      Alert.alert('Position introuvable', 'Activez la localisation du téléphone, puis réessayez.');
+    }
   };
 
   return (
-    <View style={{ flex: 1 }}>
-      <MapView
+    <View style={{ flex: 1, backgroundColor: colors.surfaceAlt }}>
+      <LeafletMap
         ref={mapRef}
         style={StyleSheet.absoluteFill}
-        initialRegion={{ ...location, latitudeDelta: 0.06, longitudeDelta: 0.06 }}
-        customMapStyle={MAP_STYLE}
-        showsUserLocation
-        showsMyLocationButton={false}
-        toolbarEnabled={false}
-      >
-        <Circle center={location} radius={filters.radiusKm * 1000} strokeColor="rgba(31,58,46,0.35)" fillColor="rgba(31,58,46,0.05)" strokeWidth={1} />
-        {meals.map((m, i) => {
-          const active = m.id === selected;
-          return (
-            <Marker key={m.id} coordinate={m.pickupLocation} onPress={() => focus(m, i)} tracksViewChanges={false} zIndex={active ? 10 : 1}>
-              <View style={[styles.pin, active && styles.pinActive]}>
-                {m.mode !== 'sale' && <Ionicons name="swap-horizontal" size={11} color={active ? colors.onDark : colors.forest} />}
-                <Text style={[styles.pinText, active && { color: colors.onDark }]}>{formatPrice(m.priceCents)}</Text>
-              </View>
-            </Marker>
-          );
-        })}
-      </MapView>
+        center={location}
+        zoom={14}
+        markers={markers}
+        selectedId={selected}
+        onSelect={select}
+        circle={{ center: location, radiusM: filters.radiusKm * 1000 }}
+        user={hasRealLocation ? location : null}
+        onError={onError}
+      />
 
-      <View style={[styles.topOverlay, { top: insets.top + spacing.sm }]}>
-        <View style={styles.row}>
+      <View style={[styles.topOverlay, { top: insets.top + spacing.sm }]} pointerEvents="box-none">
+        <View style={styles.row} pointerEvents="box-none">
           <View style={styles.searchPill}>
             <Ionicons name="location" size={16} color={colors.tomato} />
             <Text style={styles.searchText} numberOfLines={1}>
-              {meals.length} repas dans un rayon de {filters.radiusKm} km
+              {loading ? 'Recherche…' : `${meals.length} repas dans un rayon de ${filters.radiusKm} km`}
             </Text>
           </View>
-          <Pressable style={styles.roundBtn} onPress={() => setSheet(true)} accessibilityLabel="Filtres">
+          <Pressable style={styles.roundBtn} onPress={onShowList} accessibilityRole="button" accessibilityLabel="Afficher la liste">
+            <Ionicons name="list-outline" size={20} color={colors.ink} />
+          </Pressable>
+          <Pressable style={styles.roundBtn} onPress={() => setSheet(true)} accessibilityRole="button" accessibilityLabel="Filtres">
             <Ionicons name="options-outline" size={20} color={colors.ink} />
             {activeFilterCount(filters) > 0 && <View style={styles.dot} />}
           </Pressable>
         </View>
-        <View style={[styles.row, { gap: spacing.sm }]}>
+        <View style={[styles.row, { gap: spacing.sm }]} pointerEvents="box-none">
           {(
             [
               ['all', 'Tout'],
@@ -114,9 +137,35 @@ function GoogleMapScreen() {
         </View>
       </View>
 
-      <Pressable style={[styles.roundBtn, styles.locate]} onPress={recenter} accessibilityLabel="Me localiser">
-        <Ionicons name="navigate" size={20} color={colors.forest} />
+      <Pressable
+        style={[styles.roundBtn, styles.locate, { bottom: meals.length ? 150 : spacing.xl }]}
+        onPress={recenter}
+        accessibilityRole="button"
+        accessibilityLabel="Me localiser"
+      >
+        <Ionicons name={hasRealLocation ? 'navigate' : 'navigate-outline'} size={20} color={colors.forest} />
       </Pressable>
+
+      {!loading && meals.length === 0 && (
+        <View style={styles.emptyCard}>
+          <Text style={type.bodyStrong}>Aucun plat dans ce rayon</Text>
+          <Text style={type.caption}>
+            {hasRealLocation
+              ? 'Élargissez la zone ou revenez plus tard : les voisins publient surtout en fin de journée.'
+              : 'Activez votre position pour voir les plats autour de vous.'}
+          </Text>
+          <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm }}>
+            {filters.radiusKm < 25 && (
+              <Button
+                title={`Élargir à ${Math.min(25, filters.radiusKm * 2)} km`}
+                size="md"
+                onPress={() => setFilters({ radiusKm: Math.min(25, filters.radiusKm * 2) })}
+              />
+            )}
+            {!hasRealLocation && <Button title="Ma position" size="md" variant="secondary" icon="navigate-outline" onPress={recenter} />}
+          </View>
+        </View>
+      )}
 
       <FlatList
         ref={listRef}
@@ -134,7 +183,7 @@ function GoogleMapScreen() {
           const m = meals[i];
           if (m && m.id !== selected) {
             setSelected(m.id);
-            mapRef.current?.animateToRegion({ ...m.pickupLocation, latitudeDelta: 0.025, longitudeDelta: 0.025 }, 350);
+            mapRef.current?.flyTo(m.pickupLocation, 15);
           }
         }}
         renderItem={({ item }) => (
@@ -150,7 +199,7 @@ function GoogleMapScreen() {
 
 const styles = StyleSheet.create({
   topOverlay: { position: 'absolute', left: spacing.xl, right: spacing.xl, gap: spacing.md },
-  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   searchPill: {
     flex: 1,
     flexDirection: 'row',
@@ -173,20 +222,17 @@ const styles = StyleSheet.create({
     ...shadow.floating,
   },
   dot: { position: 'absolute', top: 10, right: 11, width: 9, height: 9, borderRadius: 5, backgroundColor: colors.tomato },
-  locate: { position: 'absolute', right: spacing.xl, bottom: 140 },
-  pin: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
+  locate: { position: 'absolute', right: spacing.xl },
+  emptyCard: {
+    position: 'absolute',
+    left: spacing.xl,
+    right: spacing.xl,
+    bottom: spacing.xl + 64,
     backgroundColor: colors.surface,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.border,
-    ...shadow.card,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    gap: 4,
+    ...shadow.floating,
   },
-  pinActive: { backgroundColor: colors.forest, borderColor: colors.forest, transform: [{ scale: 1.1 }] },
-  pinText: { fontFamily: fonts.bold, fontSize: 13, color: colors.ink },
   carousel: { position: 'absolute', bottom: spacing.xl, left: 0, right: 0, flexGrow: 0 },
 });

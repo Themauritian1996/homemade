@@ -61,12 +61,38 @@ const expectError = async (label, fn, pattern) => {
   }
 };
 
+// 0) Bêta fermée : inscription sur code d'invitation
+const signup = (email, meta = {}) => q(`insert into auth.users (email, raw_user_meta_data) values ($1, $2::jsonb) returning id`, [email, JSON.stringify(meta)]);
+await expectError('inscription sans code d’invitation refusée', () => signup('intrus@test.ca'), /INVITE_CODE_INVALID/);
+await expectError('inscription avec un code inconnu refusée', () => signup('intrus@test.ca', { invite_code: 'FAUX-CODE' }), /INVITE_CODE_INVALID/);
+const [{ s: st1 }] = await q(`select public.invite_status(' voisins2026 ') as s`);
+check('invite_status : code normalisé (casse, espaces) reconnu', st1.required === true && st1.valid === true, JSON.stringify(st1));
+
 // Utilisateurs
-const [cook] = await q(`insert into auth.users (email, raw_user_meta_data) values ('amelie@test.ca', '{"display_name":"Amélie"}') returning id`);
-const [eater] = await q(`insert into auth.users (email) values ('karim@test.ca') returning id`);
-const [allergic] = await q(`insert into auth.users (email, raw_user_meta_data) values ('sofia@test.ca', '{"display_name":"Sofia"}') returning id`);
+const [cook] = await signup('amelie@test.ca', { display_name: 'Amélie', invite_code: 'VOISINS2026' });
+const [eater] = await signup('karim@test.ca', { invite_code: 'voisins2026' });
+const [allergic] = await signup('sofia@test.ca', { display_name: 'Sofia', invite_code: 'VOISINS2026' });
 const profiles = await q(`select display_name from public.profiles order by display_name`);
 check('trigger handle_new_user crée les profils', profiles.length === 3, profiles.map((p) => p.display_name).join(', '));
+const [inv] = await q(`select uses from public.beta_invites where code = 'VOISINS2026'`);
+check('code d’invitation consommé à chaque inscription', inv.uses === 3, `uses=${inv.uses}`);
+
+await q(`insert into public.beta_invites (code, max_uses) values ('UNE-FOIS', 1)`);
+await signup('premier@test.ca', { invite_code: 'UNE-FOIS' });
+await expectError('code épuisé refusé', () => signup('second@test.ca', { invite_code: 'UNE-FOIS' }), /INVITE_CODE_INVALID/);
+await q(`insert into public.beta_invites (code, max_uses, expires_at) values ('EXPIRE', 10, now() - interval '1 day')`);
+await expectError('code expiré refusé', () => signup('tard@test.ca', { invite_code: 'EXPIRE' }), /INVITE_CODE_INVALID/);
+
+await as(cook.id);
+const [{ c: myCode }] = await q(`select public.my_invite_code() as c`);
+const [{ c: myCode2 }] = await q(`select public.my_invite_code() as c`);
+check('code personnel : 5 invitations, stable', myCode.maxUses === 5 && myCode.code === myCode2.code && /^HM-[A-Z2-9]{6}$/.test(myCode.code), JSON.stringify(myCode));
+const [invited] = await signup('voisine@test.ca', { invite_code: myCode.code });
+const [iv] = await q(`select invited_with from public.profiles where id = $1`, [invited.id]);
+check('code personnel utilisable par un voisin', iv.invited_with === myCode.code);
+
+const [{ b: boot0 }] = await q(`select public.session_bootstrap() as b`);
+check('session : non onboardé avant le profil santé', boot0.onboarded === false && boot0.deleted === false, JSON.stringify(boot0));
 
 await q(`update public.user_private set stripe_charges_enabled = true where user_id in ($1, $2)`, [cook.id, eater.id]);
 
@@ -197,7 +223,73 @@ await q(`insert into public.reports (reporter_id, meal_id, reason, details) valu
 const [susp] = await q(`select status from public.meals where id = $1`, [meal1]);
 check('incident allergène ⇒ plat suspendu', susp.status === 'suspended');
 
-// 9) Privilèges : le rôle authenticated ne peut ni lire le point exact ni sonder un profil santé
+// 9) Espace Cooker : retrait d'annonce
+await as(cook.id);
+const [{ b: boot1 }] = await q(`select public.session_bootstrap() as b`);
+check('session : toujours non onboardé sans profil santé', boot1.onboarded === false);
+await q(`select public.set_health_profile('[]'::jsonb, '{}', false)`);
+const [{ b: boot2 }] = await q(`select public.session_bootstrap() as b`);
+check('session : onboardé dès que le profil santé est enregistré (même vide)', boot2.onboarded === true);
+const [{ m: mine }] = await q(`select public.my_meals() as m`);
+check('mes plats : liste avec commandes actives', mine.length === 2 && mine.every((x) => typeof x.activeOrders === 'number'), mine.map((x) => `${x.title}:${x.status}:${x.activeOrders}`).join(', '));
+const [{ publish_meal: toWithdraw }] = await q(`select public.publish_meal($1::jsonb)`, [
+  JSON.stringify({ ...basePayload, photoPaths: [], title: 'Soupe aux pois', cuisine: 'quebecois', mode: 'swap', priceCents: null, diets: [], declaredAllergens: [],
+    ingredients: [{ name: 'Pois jaunes', allergens: [], source: 'cooker' }] }),
+]);
+await as(eater.id);
+const [{ propose_swap: pendingSwap }] = await q(`select public.propose_swap($1, $2, 'Échange ?')`, [toWithdraw, karimMeal]);
+await expectError('retrait du plat d’un autre Cooker interdit', () => q(`select public.withdraw_meal($1)`, [toWithdraw]), /FORBIDDEN/);
+await as(cook.id);
+await q(`select public.withdraw_meal($1)`, [toWithdraw]);
+const [wd] = await q(`select status from public.meals where id = $1`, [toWithdraw]);
+const [ps] = await q(`select status from public.orders where id = $1`, [pendingSwap.order_id]);
+check('retrait : plat archivé, proposition d’échange en attente refusée', wd.status === 'archived' && ps.status === 'declined', `${wd.status} / ${ps.status}`);
+
+// 10) Commentaires des testeurs & export Loi 25
+await db.exec(`set role authenticated`);
+await q(`insert into public.beta_feedback (user_id, kind, message, screen) values ($1, 'bug', 'La carte ne charge pas', 'map')`, [cook.id]);
+await expectError('commentaire au nom d’un autre membre refusé', () => q(`insert into public.beta_feedback (user_id, kind, message) values ($1, 'idea', 'Usurpation')`, [eater.id]), /row-level security/);
+await expectError('codes d’invitation illisibles par les clients', () => q(`select code from public.beta_invites`), /permission denied/);
+await db.exec(`reset role`);
+const [{ e: exported }] = await q(`select public.export_my_data() as e`);
+check('export Loi 25 : profil, plats, commandes, commentaires', exported.profile.id === cook.id && exported.meals.length >= 2 && exported.orders.length >= 1 && exported.feedback.length === 1,
+  `plats=${exported.meals.length} commandes=${exported.orders.length}`);
+
+// 11) Suppression de compte
+const [leaver] = await signup('depart@test.ca', { display_name: 'Léa', invite_code: 'VOISINS2026' });
+await as(leaver.id);
+await q(`select public.set_health_profile($1::jsonb, $2::text[], false)`, [JSON.stringify([{ code: 'peanut', severity: 'allergy' }]), '{}']);
+const [{ publish_meal: leaverMeal }] = await q(`select public.publish_meal($1::jsonb)`, [
+  JSON.stringify({ ...basePayload, photoPaths: [], title: 'Tarte aux pommes', cuisine: 'dessert', mode: 'swap', priceCents: null, diets: [], declaredAllergens: [],
+    ingredients: [{ name: 'Pommes', allergens: [], source: 'cooker' }] }),
+]);
+await as(eater.id);
+const [{ propose_swap: leaverSwap }] = await q(`select public.propose_swap($1, $2, null)`, [leaverMeal, karimMeal]);
+await as(leaver.id);
+await q(`select public.transition_order($1, 'accepted')`, [leaverSwap.order_id]);
+await q(`select public.delete_my_account()`);
+const [gone] = await q(`select display_name, deleted_at is not null as d from public.profiles where id = $1`, [leaver.id]);
+const [health] = await q(`select (select count(*)::int from public.user_allergens where user_id = $1) + (select count(*)::int from public.user_diets where user_id = $1) as n`, [leaver.id]);
+const [lm] = await q(`select status, portions_left from public.meals where id = $1`, [leaverMeal]);
+const [ls] = await q(`select status from public.orders where id = $1`, [leaverSwap.order_id]);
+check('suppression : profil anonymisé', gone.d && gone.display_name === 'Membre supprimé');
+check('suppression : données santé effacées', health.n === 0);
+check('suppression : annonces retirées, échange accepté annulé (portions rendues)', lm.status === 'archived' && ls.status === 'cancelled' && lm.portions_left === 3, `${lm.status} ${lm.portions_left} / ${ls.status}`);
+const [{ b: bootGone }] = await q(`select public.session_bootstrap() as b`);
+check('session : compte supprimé détecté à la reconnexion', bootGone.deleted === true);
+await as(eater.id);
+await expectError('suppression refusée avec une commande payante en cours', async () => {
+  await q(`update public.meals set portions_left = 3, status = 'published' where id = $1`, [meal2]);
+  await q(`select public.create_purchase_order($1, $2, 1, 0.05, 0.12)`, [meal2, eater.id]);
+  await q(`select public.delete_my_account()`);
+}, /ACTIVE_PAID_ORDERS/);
+
+// 12) Invitations désactivables par l'équipe
+await q(`update public.app_config set value = 'false' where key = 'invite_required'`);
+const [open] = await signup('libre@test.ca');
+check('inscriptions ouvertes : compte créé sans code', Boolean(open?.id));
+
+// 13) Privilèges : le rôle authenticated ne peut ni lire le point exact ni sonder un profil santé
 await db.exec(`set role authenticated`);
 await expectError('colonne pickup_point illisible pour authenticated', () => q(`select pickup_point from public.meals limit 1`), /permission denied/);
 await expectError('meal_is_safe_for non exécutable par authenticated', () => q(`select public.meal_is_safe_for($1, $2)`, [meal2, allergic.id]), /permission denied/);

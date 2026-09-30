@@ -1,12 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
-import { FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { OrderActions } from '@/components/OrderActions';
 import { Avatar, IconButton } from '@/components/ui';
 import { DEMO_USER_ID } from '@/data/mock';
-import { fetchConversations, fetchMessages, markConversationRead, sendMessage, subscribeToConversation } from '@/services/chat';
+import { fetchConversations, fetchMessages, markConversationRead, refreshUnread, sendMessage, subscribeToConversation } from '@/services/chat';
+import { friendlyError } from '@/lib/errors';
 import { useApp } from '@/store/app';
 import { colors, fonts, radius, spacing, type } from '@/theme';
 import type { Conversation, Message } from '@/types';
@@ -25,14 +26,29 @@ export default function Chat() {
   useEffect(() => {
     fetchConversations().then((all) => setConv(all.find((c) => c.id === id) ?? null));
     fetchMessages(id).then(setMessages);
-    markConversationRead(id).catch(() => {});
-    return subscribeToConversation(id, (m) => setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m])));
+    const markRead = () =>
+      markConversationRead(id)
+        .then(refreshUnread)
+        .catch(() => {});
+    markRead();
+    const unsubscribe = subscribeToConversation(id, (m) => {
+      setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]));
+      markRead(); // conversation ouverte : le message est lu
+    });
+    return unsubscribe;
   }, [id]);
 
   const send = async (text: string) => {
     if (!text.trim()) return;
     setDraft('');
-    const m = await sendMessage(id, me, text);
+    let m: Message;
+    try {
+      m = await sendMessage(id, me, text);
+    } catch (e) {
+      setDraft(text);
+      Alert.alert('Message non envoyé', friendlyError(e));
+      return;
+    }
     setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]));
     requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
   };

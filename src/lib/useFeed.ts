@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { fetchFeed, FeedResult } from '@/services/meals';
 import { useApp } from '@/store/app';
+import { friendlyError } from './errors';
 
 /** Fil de repas partagé par l'onglet Découvrir et la Carte ; se recharge quand filtres/position/profil santé changent. */
 export function useFeed() {
@@ -17,7 +18,7 @@ export function useFeed() {
     try {
       setData(await fetchFeed(filters, location, health));
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Erreur de chargement');
+      setError(friendlyError(e, 'Erreur de chargement.'));
     } finally {
       setLoading(false);
     }

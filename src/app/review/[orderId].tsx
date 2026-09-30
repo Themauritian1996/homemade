@@ -7,6 +7,7 @@ import React, { useState } from 'react';
 import { Alert, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, Chip, IconButton, Stars } from '@/components/ui';
+import { friendlyError } from '@/lib/errors';
 import { submitReview } from '@/services/orders';
 import { colors, fonts, radius, spacing, type } from '@/theme';
 
@@ -35,6 +36,8 @@ export default function ReviewModal() {
       await submitReview({ orderId, rating, comment, tags, subScores: sub });
       Alert.alert('Merci !', 'Votre avis sera publié dès que les deux parties auront noté l’échange.');
       router.back();
+    } catch (e) {
+      Alert.alert('Avis non enregistré', friendlyError(e));
     } finally {
       setLoading(false);
     }

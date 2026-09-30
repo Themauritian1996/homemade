@@ -1,6 +1,7 @@
 /** Messagerie temps réel — Supabase Realtime (postgres_changes sur `messages`, filtré par RLS). */
 import { DEMO_MODE } from '@/lib/config';
 import { requireSupabase } from '@/lib/supabase';
+import { useApp } from '@/store/app';
 import { conversations as demoConversations, messages as demoMessages, DEMO_USER_ID } from '@/data/mock';
 import type { Conversation, Message } from '@/types';
 import { photoUrl } from './meals';
@@ -63,6 +64,26 @@ export function subscribeToConversation(conversationId: string, onMessage: (m: M
       const r = payload.new as Record<string, string>;
       onMessage({ id: r.id, conversationId: r.conversation_id, senderId: r.sender_id, body: r.body, kind: r.kind as Message['kind'], createdAt: r.created_at });
     })
+    .subscribe();
+  return () => {
+    sb.removeChannel(channel);
+  };
+}
+
+/** Recalcule le nombre total de messages non lus (pastille de l'onglet Messages). */
+export async function refreshUnread() {
+  if (DEMO_MODE) return useApp.getState().setUnread(1);
+  const list = await fetchConversations();
+  useApp.getState().setUnread(list.reduce((n, c) => n + Number(c.unread || 0), 0));
+}
+
+/** Tout nouveau message dans une de MES conversations (la RLS filtre le flux Realtime). */
+export function subscribeToMyMessages(onChange: () => void): () => void {
+  if (DEMO_MODE) return () => {};
+  const sb = requireSupabase();
+  const channel = sb
+    .channel('my-messages')
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => onChange())
     .subscribe();
   return () => {
     sb.removeChannel(channel);

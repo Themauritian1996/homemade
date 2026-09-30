@@ -1,15 +1,17 @@
 /**
  * Configuration runtime. Les variables EXPO_PUBLIC_* sont embarquées dans le bundle :
- * n'y mettez JAMAIS de secret (clé service Supabase, clé secrète Stripe, clé Anthropic).
+ * n'y mettez JAMAIS de secret (clé service Supabase, clé secrète Stripe, clés d'IA Gemini/Groq/Anthropic).
  * Ces secrets vivent uniquement dans les Edge Functions (`supabase secrets set`).
  */
 export const config = {
   supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL ?? '',
   supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '',
   stripePublishableKey: process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '',
-  /** `local` = Qwen3-VL via Ollama sur le PC (développement) ; `server` = Edge Function (Claude) ; `none` = saisie manuelle. */
+  /** `local` = Qwen3-VL via Ollama sur le PC (développement) ; `server` = Edge Function (IA gratuite Gemini, secours Groq) ; `none` = saisie manuelle. */
   aiProvider: (process.env.EXPO_PUBLIC_AI_PROVIDER ?? 'server') as 'local' | 'server' | 'none',
   localAiModel: process.env.EXPO_PUBLIC_LOCAL_AI_MODEL ?? 'qwen3-vl:2b-instruct',
+  /** Lien PUBLIC de téléchargement de l'app de test (ex. dossier Google Drive), ajouté aux invitations partagées. */
+  betaDownloadUrl: process.env.EXPO_PUBLIC_BETA_DOWNLOAD_URL ?? '',
   /** Commission plateforme appliquée aux ventes (affichage ; le calcul fait foi côté serveur). */
   platformFeeRate: 0.12,
   defaultRegion: { latitude: 45.5231, longitude: -73.5817, latitudeDelta: 0.06, longitudeDelta: 0.06 }, // Plateau, Montréal

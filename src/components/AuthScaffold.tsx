@@ -13,7 +13,7 @@ export function AuthScaffold({ title, subtitle, children }: { title: string; sub
         contentContainerStyle={{ paddingTop: insets.top + spacing.md, paddingBottom: insets.bottom + spacing.xl, paddingHorizontal: spacing.xxl, flexGrow: 1 }}
         keyboardShouldPersistTaps="handled"
       >
-        <IconButton icon="chevron-back" onPress={() => router.back()} accessibilityLabel="Retour" />
+        <IconButton icon="chevron-back" onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} accessibilityLabel="Retour" />
         <View style={{ marginTop: spacing.xxl, marginBottom: spacing.xxl, gap: spacing.sm }}>
           <Text style={type.h1}>{title}</Text>
           <Text style={type.body}>{subtitle}</Text>

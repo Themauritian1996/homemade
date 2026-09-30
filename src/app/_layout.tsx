@@ -53,7 +53,16 @@ export default function RootLayout() {
           <Stack.Screen name="order/[id]" options={{ presentation: 'modal' }} />
           <Stack.Screen name="health" options={{ presentation: 'modal' }} />
           <Stack.Screen name="review/[orderId]" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="settings" />
+          <Stack.Screen name="my-meals" />
+          <Stack.Screen name="invite" />
+          <Stack.Screen name="favorites" />
+          <Stack.Screen name="help" />
+          <Stack.Screen name="report" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="feedback" options={{ presentation: 'modal' }} />
         </Stack.Protected>
+        {/* Accessibles avant et après connexion (lien depuis l'inscription). */}
+        <Stack.Screen name="legal/[doc]" />
       </Stack>
     </SafeAreaProvider>
   );

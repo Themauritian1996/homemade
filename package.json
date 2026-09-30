@@ -30,11 +30,11 @@
     "react-dom": "19.2.3",
     "react-native": "0.86.3",
     "react-native-gesture-handler": "~2.32.0",
-    "react-native-maps": "1.27.2",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.0",
     "react-native-url-polyfill": "^4.0.0",
     "react-native-web": "^0.21.2",
+    "react-native-webview": "13.16.1",
     "zustand": "^5.0.15"
   },
   "devDependencies": {
@@ -51,7 +51,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "expo lint",
     "test:db": "node supabase/tests/db.test.mjs",
-    "test:ai": "node scripts/test-local-ai.mjs"
+    "test:ai": "node scripts/test-local-ai.mjs",
+    "test:ai-providers": "node --experimental-strip-types --no-warnings scripts/test-ai-providers.mjs"
   },
   "private": true
 }

@@ -2,19 +2,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
+import { router } from 'expo-router';
 import React from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  PressableProps,
-  StyleProp,
-  StyleSheet,
-  Text,
-  TextInput,
-  TextInputProps,
-  View,
-  ViewStyle,
-} from 'react-native';
+import { ActivityIndicator, Pressable, PressableProps, StyleProp, StyleSheet, Text, TextInput, TextInputProps, View, ViewStyle } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, fonts, radius, spacing, type } from '@/theme';
 import { formatRating } from '@/lib/format';
 
@@ -236,7 +227,83 @@ export function Divider({ style }: { style?: StyleProp<ViewStyle> }) {
   return <View style={[{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border }, style]} />;
 }
 
+// ───────────────────────────── Écrans secondaires
+const goBack = () => (router.canGoBack() ? router.back() : router.replace('/'));
+
+/** En-tête standard d'un écran secondaire : retour (ou fermer pour une modale) + titre. */
+export function ScreenHeader({ title, subtitle, modal, right }: { title: string; subtitle?: string; modal?: boolean; right?: React.ReactNode }) {
+  const insets = useSafeAreaInsets();
+  return (
+    <View style={[styles.screenHeader, { paddingTop: insets.top + spacing.sm }]}>
+      {!modal && <IconButton icon="chevron-back" onPress={goBack} accessibilityLabel="Retour" />}
+      <View style={{ flex: 1 }}>
+        <Text style={type.h2} numberOfLines={1}>
+          {title}
+        </Text>
+        {subtitle && <Text style={type.caption}>{subtitle}</Text>}
+      </View>
+      {right}
+      {modal && <IconButton icon="close" onPress={goBack} accessibilityLabel="Fermer" />}
+    </View>
+  );
+}
+
+export function Card({ children, style }: { children: React.ReactNode; style?: StyleProp<ViewStyle> }) {
+  return <View style={[styles.card, style]}>{children}</View>;
+}
+
+/** Ligne de liste (profil, paramètres, aide) : icône, titre, sous-titre, chevron ou contenu à droite. */
+export function ListRow({
+  icon,
+  title,
+  subtitle,
+  onPress,
+  right,
+  tone = 'forest',
+}: {
+  icon: IconName;
+  title: string;
+  subtitle?: string;
+  onPress?: () => void;
+  right?: React.ReactNode;
+  tone?: 'forest' | 'danger';
+}) {
+  const fg = tone === 'danger' ? colors.danger : colors.forest;
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={!onPress}
+      accessibilityRole={onPress ? 'button' : undefined}
+      style={({ pressed }) => [styles.listRow, pressed && { opacity: 0.7 }]}
+    >
+      <View style={[styles.listRowIcon, tone === 'danger' && { backgroundColor: colors.dangerSoft }]}>
+        <Ionicons name={icon} size={18} color={fg} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[type.bodyStrong, tone === 'danger' && { color: colors.danger }]}>{title}</Text>
+        {subtitle && (
+          <Text style={type.caption} numberOfLines={2}>
+            {subtitle}
+          </Text>
+        )}
+      </View>
+      {right ?? (onPress && <Ionicons name="chevron-forward" size={18} color={colors.muted} />)}
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
+  screenHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.md,
+    backgroundColor: colors.bg,
+  },
+  card: { backgroundColor: colors.surface, borderRadius: radius.lg, paddingHorizontal: spacing.lg },
+  listRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.lg, minHeight: 56 },
+  listRowIcon: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.sage, alignItems: 'center', justifyContent: 'center' },
   btn: {
     height: 54,
     borderRadius: radius.lg,

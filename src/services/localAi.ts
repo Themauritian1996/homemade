@@ -2,17 +2,26 @@
  * IA LOCALE (développement uniquement) — Qwen3-VL via Ollama sur le PC du développeur.
  *
  * L'app appelle `http://<ip-du-PC>:8081/local-ai` : la route API src/app/local-ai+api.ts relaie vers Ollama.
- * Aucun secret, aucune donnée hors du réseau local. Même prompt, même schéma JSON et même nettoyage
- * que l'Edge Function Claude (source unique : supabase/functions/analyze-meal/prompt.ts).
+ * Aucun secret, aucune donnée hors du réseau local. Mêmes prompts, mêmes schémas JSON et même nettoyage
+ * que l'Edge Function en ligne (source unique : supabase/functions/analyze-meal/prompt.ts).
  *
  * Les lignes maîtresses restent respectées : l'IA ne fait que PRÉ-REMPLIR ; le Cooker atteste et
  * `publish_meal` recalcule les allergènes côté serveur.
  */
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
-import { LOCAL_OUTPUT_SCHEMA, LOCAL_SYSTEM_PROMPT, RawAnalysis, sanitize } from '../../supabase/functions/analyze-meal/prompt';
+import {
+  LOCAL_OCR_OUTPUT_SCHEMA,
+  LOCAL_OCR_SYSTEM_PROMPT,
+  LOCAL_OUTPUT_SCHEMA,
+  LOCAL_SYSTEM_PROMPT,
+  RawAnalysis,
+  RawTextScan,
+  sanitize,
+  sanitizeOcr,
+} from '../../supabase/functions/analyze-meal/prompt';
 import { config } from '@/lib/config';
-import type { AiMealAnalysis } from '@/types';
+import type { AiMealAnalysis, AiTextScan } from '@/types';
 
 /** Adresse de Metro vue par l'appareil (ex. 192.168.1.23:8081), ou localhost pour l'aperçu web. */
 function metroOrigin(): string | null {
@@ -23,7 +32,7 @@ function metroOrigin(): string | null {
 
 export const localAiAvailable = () => __DEV__ && config.aiProvider === 'local' && metroOrigin() !== null;
 
-export async function analyzeWithLocalModel(base64Jpeg: string): Promise<AiMealAnalysis> {
+async function callLocalModel(system: string, schema: object, instruction: string, base64Jpeg: string, numPredict: number): Promise<unknown> {
   const origin = metroOrigin();
   if (!origin) throw new Error('IA locale : serveur de développement introuvable.');
 
@@ -38,12 +47,12 @@ export async function analyzeWithLocalModel(base64Jpeg: string): Promise<AiMealA
         model: config.localAiModel,
         stream: false,
         think: false,
-        format: LOCAL_OUTPUT_SCHEMA, // même structure que Claude, avec des tailles bornées pour les petits modèles
+        format: schema, // même structure que l'IA en ligne, avec des tailles bornées pour les petits modèles
         keep_alive: '30m',
-        options: { temperature: 0, num_predict: 900, num_ctx: 4096 },
+        options: { temperature: 0, num_predict: numPredict, num_ctx: 4096 },
         messages: [
-          { role: 'system', content: LOCAL_SYSTEM_PROMPT },
-          { role: 'user', content: 'Analyse ce plat pour pré-remplir son annonce. Réponds uniquement en JSON.', images: [base64Jpeg] },
+          { role: 'system', content: system },
+          { role: 'user', content: instruction, images: [base64Jpeg] },
         ],
       }),
     });
@@ -58,9 +67,30 @@ export async function analyzeWithLocalModel(base64Jpeg: string): Promise<AiMealA
       content += chunk.message?.content ?? '';
     }
     if (!res.ok || error || !content) throw new Error(error ?? `IA locale : HTTP ${res.status}`);
-    const raw = JSON.parse(content) as RawAnalysis;
-    return sanitize(raw, `${config.localAiModel}@local`) as AiMealAnalysis;
+    return JSON.parse(content);
   } finally {
     clearTimeout(timer);
   }
+}
+
+export async function analyzeWithLocalModel(base64Jpeg: string): Promise<AiMealAnalysis> {
+  const raw = await callLocalModel(
+    LOCAL_SYSTEM_PROMPT,
+    LOCAL_OUTPUT_SCHEMA,
+    'Analyse ce plat pour pré-remplir son annonce. Réponds uniquement en JSON.',
+    base64Jpeg,
+    900,
+  );
+  return sanitize(raw as RawAnalysis, `${config.localAiModel}@local`) as AiMealAnalysis;
+}
+
+export async function readTextWithLocalModel(base64Jpeg: string): Promise<AiTextScan> {
+  const raw = await callLocalModel(
+    LOCAL_OCR_SYSTEM_PROMPT,
+    LOCAL_OCR_OUTPUT_SCHEMA,
+    'Lis le texte de cette photo. Réponds uniquement en JSON.',
+    base64Jpeg,
+    1400,
+  );
+  return sanitizeOcr(raw as RawTextScan, `${config.localAiModel}@local`) as AiTextScan;
 }
