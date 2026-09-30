@@ -161,11 +161,11 @@ export default function Profile() {
 
 function Stat({ label, value, sub, icon }: { label: string; value: string; sub: string; icon: IconName }) {
   return (
-    <View style={{ flex: 1, alignItems: 'center', gap: 2 }}>
+    <View style={{ flex: 1, alignItems: 'center', gap: 2, paddingHorizontal: spacing.xs }}>
       <Ionicons name={icon} size={18} color={colors.tomato} />
       <Text style={[type.h2, { fontSize: 22 }]}>{value}</Text>
-      <Text style={[type.caption, { fontFamily: fonts.semibold, color: colors.ink }]}>{label}</Text>
-      <Text style={type.caption}>{sub}</Text>
+      <Text style={[type.caption, { fontFamily: fonts.semibold, color: colors.ink, textAlign: 'center' }]}>{label}</Text>
+      <Text style={[type.caption, { textAlign: 'center' }]}>{sub}</Text>
     </View>
   );
 }

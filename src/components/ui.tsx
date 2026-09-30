@@ -227,6 +227,23 @@ export function Divider({ style }: { style?: StyleProp<ViewStyle> }) {
   return <View style={[{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border }, style]} />;
 }
 
+// ───────────────────────────── Marque
+const LOGO_MARK = require('../../assets/brand/logo-mark.png');
+
+/** Logo Homemade : la marque (toit + bol fumant, comme l'icône de l'app) suivie du mot « homemade. ». */
+export function Logo({ size = 32, light, markOnly }: { size?: number; light?: boolean; markOnly?: boolean }) {
+  return (
+    <View style={styles.logo} accessibilityRole="image" accessibilityLabel="Homemade">
+      <Image source={LOGO_MARK} style={{ width: size, height: size, borderRadius: size * 0.26 }} contentFit="contain" />
+      {!markOnly && (
+        <Text style={[styles.logoText, { fontSize: size * 0.78, color: light ? colors.onDark : colors.forest }]}>
+          homemade<Text style={{ color: colors.tomato }}>.</Text>
+        </Text>
+      )}
+    </View>
+  );
+}
+
 // ───────────────────────────── Écrans secondaires
 const goBack = () => (router.canGoBack() ? router.back() : router.replace('/'));
 
@@ -293,6 +310,8 @@ export function ListRow({
 }
 
 const styles = StyleSheet.create({
+  logo: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  logoText: { fontFamily: fonts.display, letterSpacing: -0.5 },
   screenHeader: {
     flexDirection: 'row',
     alignItems: 'center',

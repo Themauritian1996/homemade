@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Button } from '@/components/ui';
+import { Button, Logo } from '@/components/ui';
 import { DEMO_MODE } from '@/lib/config';
 import { colors, fonts, spacing, type } from '@/theme';
 
@@ -17,9 +17,7 @@ export default function Welcome() {
       <Image source={{ uri: HERO }} style={StyleSheet.absoluteFill} contentFit="cover" transition={400} />
       <LinearGradient colors={['rgba(31,58,46,0.15)', 'rgba(31,58,46,0.55)', colors.forest]} locations={[0, 0.45, 0.8]} style={StyleSheet.absoluteFill} />
       <View style={[styles.content, { paddingTop: insets.top + spacing.lg, paddingBottom: insets.bottom + spacing.xl }]}>
-        <Text style={styles.logo}>
-          homemade<Text style={{ color: colors.tomato }}>.</Text>
-        </Text>
+        <Logo size={36} light />
         <View style={{ flex: 1 }} />
         <Text style={styles.kicker}>FAIT MAISON · PRÈS DE CHEZ VOUS</Text>
         <Text style={styles.title}>
@@ -39,7 +37,6 @@ export default function Welcome() {
 
 const styles = StyleSheet.create({
   content: { flex: 1, paddingHorizontal: spacing.xxl },
-  logo: { fontFamily: fonts.display, fontSize: 26, color: colors.onDark, letterSpacing: -0.5 },
   kicker: { ...type.label, color: 'rgba(255,255,255,0.75)', marginBottom: spacing.md },
   title: { ...type.hero, color: colors.onDark, fontSize: 38, lineHeight: 44 },
   subtitle: { ...type.body, color: 'rgba(255,255,255,0.85)', marginTop: spacing.md, fontSize: 16, lineHeight: 24 },
