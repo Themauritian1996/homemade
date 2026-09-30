@@ -85,15 +85,32 @@ async function tap(re, opts) {
   return n;
 }
 
-async function typeInto(index, value) {
-  const fields = nodes(dump()).filter((n) => n.cls.includes('EditText'));
-  const f = fields[index];
-  if (!f) return false;
-  adb('shell', 'input', 'tap', String(Math.round(f.x)), String(Math.round(f.y)));
-  await sleep(500);
-  adb('shell', 'input', 'text', value.replace(/ /g, '%s'));
-  await sleep(300);
-  return true;
+/** Saisit `value` dans le n-ième champ texte, après avoir fermé une éventuelle fenêtre système ; vérifie la saisie. */
+async function typeInto(index, value, { secret = false } = {}) {
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    let list = nodes(dump());
+    if (dismissSystemDialog(list)) {
+      await sleep(1500);
+      list = nodes(dump());
+    }
+    const f = list.filter((n) => n.cls.includes('EditText'))[index];
+    if (!f) {
+      await sleep(1000);
+      continue;
+    }
+    adb('shell', 'input', 'tap', String(Math.round(f.x)), String(Math.round(f.y)));
+    await sleep(600);
+    // Efface l'éventuel contenu (fin du champ puis effacements).
+    adb('shell', 'input', 'keyevent', 'KEYCODE_MOVE_END');
+    adb('shell', 'input', 'keyevent', ...Array(60).fill('KEYCODE_DEL'));
+    adb('shell', 'input', 'text', value.replace(/ /g, '%s'));
+    await sleep(600);
+    const after = nodes(dump()).filter((n) => n.cls.includes('EditText'))[index];
+    const ok = secret ? (after?.text ?? '').length >= value.length : after?.text === value;
+    if (ok) return true;
+    console.log(`  (saisie du champ ${index} à refaire : « ${secret ? '•••' : after?.text ?? ''} »)`);
+  }
+  return false;
 }
 
 const hideKeyboard = () => {
@@ -136,8 +153,8 @@ try {
   await tap(/déjà un compte|already have an account/i);
   await find(/Bon retour|Welcome back/i);
   if (!ROBOT_EMAIL || !ROBOT_PASSWORD) throw new Error('Compte robot absent (ROBOT_EMAIL / ROBOT_PASSWORD)');
-  await typeInto(0, ROBOT_EMAIL);
-  await typeInto(1, ROBOT_PASSWORD);
+  const typed = (await typeInto(0, ROBOT_EMAIL)) && (await typeInto(1, ROBOT_PASSWORD, { secret: true }));
+  step(typed, 'Courriel et mot de passe saisis');
   hideKeyboard();
   await sleep(800);
   shot('connexion');

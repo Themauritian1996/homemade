@@ -294,6 +294,35 @@ await expectError('suppression refusée avec une commande payante en cours', asy
   await q(`select public.delete_my_account()`);
 }, /ACTIVE_PAID_ORDERS/);
 
+// 11b) Adresse privée, zone publique par code postal, anti-contournement dans le chat
+await as(cook.id);
+const [{ a: addr }] = await q(`select public.set_my_address('123 rue Rachel Est, Montréal', 'h2j1a1', 45.5245, -73.5825) as a`);
+check('adresse : code postal normalisé, zone publique = 3 caractères', addr.postalCode === 'H2J 1A1' && addr.zone === 'H2J', JSON.stringify(addr));
+await expectError('adresse : code postal invalide refusé', () => q(`select public.set_my_address('x', '12345', 45.5, -73.5)`), /INVALID_POSTAL_CODE/);
+const [{ publish_meal: zoned }] = await q(`select public.publish_meal($1::jsonb)`, [
+  JSON.stringify({ ...basePayload, photoPaths: [], title: 'Pâté chinois', cuisine: 'quebecois', mode: 'swap', priceCents: null, diets: [], declaredAllergens: [],
+    pickupArea: 'Plateau, 123 rue Rachel', ingredients: [{ name: 'Boeuf haché', allergens: [], source: 'cooker' }, { name: 'Maïs', allergens: [], source: 'cooker' }] }),
+]);
+const [zm] = await q(`select pickup_area from public.meals where id = $1`, [zoned]);
+check('zone publique : code postal abrégé, aucun numéro d’adresse', zm.pickup_area === 'H2J · Plateau, rue Rachel', zm.pickup_area);
+await as(eater.id);
+const [{ publish_meal: breadMeal }] = await q(`select public.publish_meal($1::jsonb)`, [
+  JSON.stringify({ ...basePayload, photoPaths: [], title: 'Pain maison', cuisine: 'other', mode: 'swap', priceCents: null, diets: [], declaredAllergens: [],
+    ingredients: [{ name: 'Farine de blé', allergens: ['wheat'], source: 'cooker' }] }),
+]);
+const [{ propose_swap: zSwap }] = await q(`select public.propose_swap($1, $2, $3)`, [zoned, breadMeal, 'Appelle-moi au 514-555-1234, ou je te paie par Interac : karim@exemple.com']);
+const msgs = await q(`select body, masked from public.messages m join public.conversations c on c.id = m.conversation_id where c.order_id = $1 and m.kind = 'text'`, [zSwap.order_id]);
+check('chat : téléphone, courriel et paiement hors app masqués', msgs.length === 1 && msgs[0].masked && !/514|exemple|interac/i.test(msgs[0].body), msgs[0]?.body);
+const [{ p: before }] = await q(`select public.get_pickup_details($1) as p`, [zSwap.order_id]);
+check('adresse invisible avant acceptation', before === null);
+await as(cook.id);
+await q(`select public.transition_order($1, 'accepted')`, [zSwap.order_id]);
+await as(eater.id);
+const [{ p: after }] = await q(`select public.get_pickup_details($1) as p`, [zSwap.order_id]);
+check('adresse écrite révélée après acceptation', after?.address === '123 rue Rachel Est, Montréal' && after?.postalCode === 'H2J 1A1', JSON.stringify(after));
+const [{ s: pay }] = await q(`select public.my_payment_status() as s`);
+check('statut des paiements lisible', typeof pay.hasAccount === 'boolean' && typeof pay.chargesEnabled === 'boolean', JSON.stringify(pay));
+
 // 12) Invitations désactivables par l'équipe
 await q(`update public.app_config set value = 'false' where key = 'invite_required'`);
 const [open] = await signup('libre@test.ca');
@@ -303,6 +332,7 @@ check('inscriptions ouvertes : compte créé sans code', Boolean(open?.id));
 await db.exec(`set role authenticated`);
 await expectError('colonne pickup_point illisible pour authenticated', () => q(`select pickup_point from public.meals limit 1`), /permission denied/);
 await expectError('meal_is_safe_for non exécutable par authenticated', () => q(`select public.meal_is_safe_for($1, $2)`, [meal2, allergic.id]), /permission denied/);
+await expectError('adresse privée illisible directement', () => q(`select address_line from public.user_private limit 1`), /permission denied/);
 await expectError('insertion directe dans meals interdite', () => q(`insert into public.meals (cooker_id) values ($1)`, [eater.id]), /permission denied/);
 const visible = await q(`select id from public.meals`);
 check('RLS : lecture des plats visibles fonctionne', visible.length >= 1, `${visible.length} plats`);

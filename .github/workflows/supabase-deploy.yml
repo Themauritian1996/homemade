@@ -9,6 +9,8 @@
 #   GROQ_API_KEY           facultatif, secours gratuit (console.groq.com/keys)
 #   GMAIL_ADDRESS          facultatif : adresse Gmail qui envoie les codes (confirmation de compte, mot de passe oublié)
 #   GMAIL_APP_PASSWORD     facultatif : « mot de passe d'application » Google de cette adresse (myaccount.google.com/apppasswords)
+#   STRIPE_SECRET_KEY      facultatif : clé secrète Stripe (sk_test_… pour tester sans argent réel) → active l'ACHAT dans l'app
+#                          (avec STRIPE_PUBLISHABLE_KEY, lue par le robot « APK Android »)
 # Projet : homemade au Canada (lcpoxseqtabauemymlss) ; autre projet possible via la variable SUPABASE_PROJECT_REF.
 name: Serveur Supabase
 
@@ -48,6 +50,7 @@ jobs:
       AI_CUSTOM_KEY: ${{ secrets.AI_CUSTOM_KEY }}
       GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
       GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+      STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
     steps:
       - uses: actions/checkout@v4
 
@@ -76,7 +79,7 @@ jobs:
         if: ${{ !inputs.dry_run }}
         run: |
           args=()
-          for name in GEMINI_API_KEY GROQ_API_KEY AI_CUSTOM_URL AI_CUSTOM_MODEL AI_CUSTOM_KEY; do
+          for name in GEMINI_API_KEY GROQ_API_KEY AI_CUSTOM_URL AI_CUSTOM_MODEL AI_CUSTOM_KEY STRIPE_SECRET_KEY; do
             value="${!name}"
             if [ -n "$value" ]; then args+=("$name=$value"); fi
           done
@@ -86,17 +89,24 @@ jobs:
             echo "Aucune clé à enregistrer."
           fi
 
-      - name: Fonction d'analyse IA
+      - name: Fonctions du serveur (IA, paiements, commandes)
         if: ${{ !inputs.dry_run }}
         run: |
-          # Envoi par l'API (le serveur Supabase assemble la fonction) ; sinon assemblage local (Docker), en mode détaillé.
-          # 3 essais : l'API de gestion de Supabase a parfois des erreurs passagères.
-          for attempt in 1 2 3; do
-            if supabase functions deploy analyze-meal --project-ref "$SUPABASE_PROJECT_REF" --use-api; then exit 0; fi
-            echo "Essai $attempt échoué, nouvel essai dans $((attempt * 20)) s…"
-            sleep $((attempt * 20))
+          # Envoi par l'API (le serveur Supabase assemble chaque fonction). 3 essais par fonction : l'API de gestion de
+          # Supabase a parfois des erreurs passagères. verify_jwt vient de supabase/config.toml.
+          for fn in analyze-meal order-action create-payment-intent stripe-connect-onboard stripe-webhook stripe-return; do
+            ok=""
+            for attempt in 1 2 3; do
+              if supabase functions deploy "$fn" --project-ref "$SUPABASE_PROJECT_REF" --use-api; then ok=1; break; fi
+              echo "$fn : essai $attempt échoué, nouvel essai dans $((attempt * 20)) s…"
+              sleep $((attempt * 20))
+            done
+            [ -n "$ok" ] || { echo "::error::Fonction $fn non déployée"; exit 1; }
           done
-          supabase functions deploy analyze-meal --project-ref "$SUPABASE_PROJECT_REF" --debug
+
+      - name: Paiements Stripe (webhooks, si la clé est fournie)
+        if: ${{ !inputs.dry_run }}
+        run: node scripts/supabase-deploy.mjs stripe
 
       - name: Test de bout en bout sur le serveur réel (compte temporaire, supprimé ensuite)
         if: ${{ !inputs.dry_run }}

@@ -40,11 +40,12 @@ jobs:
     env:
       # Valeurs PUBLIQUES (embarquées dans l'app) : Settings → Secrets and variables → Actions → Variables.
       # URL et clé PUBLIQUE Supabase : lues automatiquement sur le projet (étape « Adresse du serveur »).
-      EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ vars.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
-      # L'IA locale (Ollama) n'existe que sur le PC de développement : l'APK utilise Claude via l'Edge Function
-      # `analyze-meal` (photo du plat + lecture d'étiquettes). Si la fonction n'est pas déployée, l'app le détecte
-      # et passe en saisie manuelle. Mettre la variable à `none` pour désactiver l'IA.
-      EXPO_PUBLIC_AI_PROVIDER: ${{ vars.EXPO_PUBLIC_AI_PROVIDER || 'server' }}
+      # Clé PUBLIABLE Stripe (pk_…, faite pour être dans l'app) : secret STRIPE_PUBLISHABLE_KEY ou variable.
+      EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_PUBLISHABLE_KEY || vars.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
+      # IA en ligne (Edge Function `analyze-meal` : Gemini gratuit, secours Groq) toujours active dans l'APK ; l'app
+      # passe d'elle-même en saisie manuelle si le serveur ne répond pas. (Une ancienne variable
+      # EXPO_PUBLIC_AI_PROVIDER=none la désactivait : elle est désormais ignorée.)
+      EXPO_PUBLIC_AI_PROVIDER: server
       # Lien de téléchargement ajouté aux invitations partagées depuis l'app : toujours la dernière version.
       # (Dépôt de téléchargement public si PUBLIC_RELEASES_REPO est défini, sinon ce dépôt-ci.)
       EXPO_PUBLIC_BETA_DOWNLOAD_URL: ${{ vars.EXPO_PUBLIC_BETA_DOWNLOAD_URL || format('https://github.com/{0}/releases/latest/download/Homemade.apk', vars.PUBLIC_RELEASES_REPO || github.repository) }}

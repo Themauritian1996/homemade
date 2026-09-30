@@ -34,7 +34,7 @@ const DOCS: Record<string, { title: string; sections: [string, string][] }> = {
       ],
       [
         'Échanges et paiements',
-        "Pendant la bêta, les plats s'échangent sans argent. Lorsque la vente sera activée, le paiement sera pré-autorisé à la commande et débité seulement à la cueillette.",
+        "Les plats s'échangent ou se vendent dans l'app. Un achat est pré-autorisé à la commande et débité seulement à la cueillette, par Stripe. Proposer ou accepter un paiement hors de l'app (Interac, comptant…) est interdit : ces demandes sont masquées et peuvent entraîner la suspension du compte.",
       ],
       [
         'Respect et sécurité',
@@ -64,7 +64,7 @@ const DOCS: Record<string, { title: string; sections: [string, string][] }> = {
       ],
       [
         'Localisation',
-        "Votre position de recherche n'est pas publiée. Le lieu de cueillette d'un plat est affiché décalé de 100 à 300 m ; l'adresse exacte n'est révélée qu'à la personne dont l'échange est accepté.",
+        "Votre position de recherche n'est pas publiée. L'adresse du Cooker reste privée : publiquement, seuls la zone postale (ex. H2J) et un point décalé de 100 à 300 m sont affichés ; l'adresse exacte n'est révélée qu'à la personne dont la commande ou l'échange est accepté (et payé, pour un achat).",
       ],
       [
         'Intelligence artificielle',

@@ -12,7 +12,7 @@ import { useApp } from '@/store/app';
 import { colors, fonts, radius, spacing, type } from '@/theme';
 import type { Conversation, Message } from '@/types';
 
-import { t } from '@/i18n';
+import { locale, t } from '@/i18n';
 const QUICK_REPLIES = ['Je suis en route 🚶', 'Je suis arrivé·e !', 'Merci, c’était délicieux 🙏'];
 
 export default function Chat() {
@@ -87,8 +87,13 @@ export default function Chat() {
           return (
             <View style={[styles.bubble, mine ? styles.mine : styles.theirs]}>
               <Text style={[styles.bubbleText, mine && { color: colors.onDark }]}>{item.body}</Text>
+              {item.masked && (
+                <Text style={[styles.time, { textAlign: 'left' }, mine && { color: 'rgba(255,255,255,0.8)' }]}>
+                  {t('🔒 Coordonnées et paiement hors app masqués : l’adresse et le paiement passent par Homemade, pour votre protection.')}
+                </Text>
+              )}
               <Text style={[styles.time, mine && { color: 'rgba(255,255,255,0.7)' }]}>
-                {new Date(item.createdAt).toLocaleTimeString('fr-CA', { hour: '2-digit', minute: '2-digit' })}
+                {new Date(item.createdAt).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' })}
               </Text>
             </View>
           );

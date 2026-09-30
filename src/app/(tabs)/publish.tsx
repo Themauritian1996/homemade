@@ -36,14 +36,15 @@ import { expandAllergens } from '@/lib/safety';
 import { ingredientsFromScan, mergeScan } from '@/lib/scanMerge';
 import { useAiAvailable } from '@/lib/useAiAvailable';
 import { aiAvailable, analyzeMealPhoto, preparePhoto, PreparedPhoto, scanText, uploadMealPhoto } from '@/services/ai';
+import { getMyAddress } from '@/services/address';
 import { publishMeal } from '@/services/meals';
+import { fetchPaymentStatus, SALES_ENABLED } from '@/services/payments';
 import { useApp } from '@/store/app';
 import { colors, fonts, radius, shadow, spacing, type } from '@/theme';
 import type { AiMealAnalysis, AiTextScan, GeoPoint, MealIngredient, MealMode } from '@/types';
 
 import { t, tr } from '@/i18n';
 /** Sans clé Stripe, la vente est impossible côté serveur : la bêta se fait en mode échange. */
-const SALES_ENABLED = Boolean(config.stripePublishableKey);
 
 /** Photo depuis l'appareil photo ou la galerie (permissions demandées au besoin). */
 async function pickImage(source: 'camera' | 'library', aspect?: [number, number]): Promise<string | null> {
@@ -257,13 +258,36 @@ function ReviewStep({
   const [mayContain, setMayContain] = useState<AllergenCode[]>([]);
   const [diets, setDiets] = useState<DietCode[]>(analysis?.diets ?? []);
   // Sans Stripe configuré, la vente est impossible côté serveur : on propose l'échange par défaut.
-  const [mode, setMode] = useState<MealMode>(SALES_ENABLED ? 'sale' : 'swap');
+  // Échange toujours possible ; la vente dès que Stripe est branché ET que le Cooker a activé ses paiements.
+  const [mode, setMode] = useState<MealMode>('swap');
+  const [canSell, setCanSell] = useState(false);
   const [price, setPrice] = useState(String(SUGGESTED_PRICE));
   const [portions, setPortions] = useState(3);
   const [hours, setHours] = useState(24);
   const [pickupArea, setPickupArea] = useState('');
   const [pickup, setPickup] = useState<GeoPoint>(location);
   const [pickupConfirmed, setPickupConfirmed] = useState(hasRealLocation);
+  // Adresse privée enregistrée (Paramètres) : lieu de cueillette par défaut, sans épingle à placer.
+  const [home, setHome] = useState<{ point: GeoPoint; zone: string | null } | null>(null);
+  const [otherPlace, setOtherPlace] = useState(false);
+
+  useEffect(() => {
+    getMyAddress()
+      .then((a) => {
+        if (a?.latitude == null || a.longitude == null) return;
+        const point = { latitude: a.latitude, longitude: a.longitude };
+        setHome({ point, zone: a.zone });
+        setPickup(point);
+        setPickupConfirmed(true);
+      })
+      .catch(() => {});
+    fetchPaymentStatus()
+      .then((st) => {
+        setCanSell(st.chargesEnabled);
+        if (st.chargesEnabled) setMode('both');
+      })
+      .catch(() => {});
+  }, []);
   const [scanning, setScanning] = useState(false);
   const [scan, setScan] = useState<AiTextScan | null>(null);
   const [attested, setAttested] = useState(false);
@@ -531,6 +555,15 @@ function ReviewStep({
                 ))}
             </View>
             {!SALES_ENABLED && <Text style={type.caption}>{t('Pendant la bêta, les plats s\'échangent entre voisins. La vente sera activée ensuite.')}</Text>}
+            {SALES_ENABLED && !canSell && mode !== 'swap' && (
+              <Pressable onPress={() => router.push('/settings')} style={styles.sellHint} accessibilityRole="button">
+                <Ionicons name="card-outline" size={18} color={colors.forest} />
+                <Text style={[type.caption, { flex: 1, color: colors.ink }]}>
+                  {t('Pour vendre, activez d’abord vos paiements (Paramètres → Paiements, 5 minutes). En attendant, publiez en mode Échange.')}
+                </Text>
+                <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+              </Pressable>
+            )}
             {mode !== 'swap' && (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
                 <View style={{ flex: 1 }}>
@@ -556,7 +589,40 @@ function ReviewStep({
           </Section>
 
           <Section title={t('Lieu de cueillette')}>
-            <PickupPicker value={pickup} onChange={setPickup} area={pickupArea} onAreaChange={setPickupArea} onConfirmed={() => setPickupConfirmed(true)} />
+            {home && !otherPlace ? (
+              <View style={styles.homeBox}>
+                <Ionicons name="home" size={20} color={colors.forest} />
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text style={type.bodyStrong}>{t('À mon adresse enregistrée')}</Text>
+                  <Text style={type.caption}>
+                    {t('Vos voisins voient la zone {zone} et un point approximatif. L’adresse est donnée après votre acceptation.', { zone: home.zone ?? '—' })}
+                  </Text>
+                  <Pressable onPress={() => setOtherPlace(true)} hitSlop={8} accessibilityRole="button">
+                    <Text style={{ fontFamily: fonts.semibold, color: colors.forest, marginTop: 4 }}>{t('Choisir un autre lieu')}</Text>
+                  </Pressable>
+                </View>
+              </View>
+            ) : (
+              <>
+                {!home && (
+                  <Pressable onPress={() => router.push('/settings')} style={styles.sellHint} accessibilityRole="button">
+                    <Ionicons name="home-outline" size={18} color={colors.forest} />
+                    <Text style={[type.caption, { flex: 1, color: colors.ink }]}>
+                      {t('Astuce : enregistrez votre adresse (privée) dans Paramètres pour ne plus placer l’épingle à chaque plat.')}
+                    </Text>
+                    <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+                  </Pressable>
+                )}
+                <PickupPicker
+                  value={pickup}
+                  onChange={setPickup}
+                  area={pickupArea}
+                  onAreaChange={setPickupArea}
+                  onConfirmed={() => setPickupConfirmed(true)}
+                  autoLocate={!home}
+                />
+              </>
+            )}
           </Section>
 
           <Pressable onPress={() => setAttested(!attested)} style={[styles.attest, attested && { borderColor: colors.forest, backgroundColor: colors.sage }]}>
@@ -746,6 +812,8 @@ function DoneStep({ onAgain }: { onAgain: () => void }) {
 }
 
 const styles = StyleSheet.create({
+  homeBox: { flexDirection: 'row', gap: spacing.md, backgroundColor: colors.sage, padding: spacing.lg, borderRadius: radius.lg },
+  sellHint: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, padding: spacing.md, borderRadius: radius.md },
   likelyRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 44 },
   captureCard: { height: 240, borderRadius: radius.xl, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', gap: spacing.md, ...shadow.floating },
   captureIcon: { width: 76, height: 76, borderRadius: 38, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },

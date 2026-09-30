@@ -35,3 +35,7 @@ double_confirm_changes = true
 # Stripe appelle ce webhook sans JWT Supabase : la signature Stripe fait office d'authentification.
 [functions.stripe-webhook]
 verify_jwt = false
+
+# Page de retour du formulaire Stripe (ouverte par le navigateur, sans JWT) : renvoie vers l'app.
+[functions.stripe-return]
+verify_jwt = false

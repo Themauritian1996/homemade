@@ -1,6 +1,7 @@
 /**
- * Carte interactive sans clé : Leaflet (embarqué dans l'app, aucun CDN à charger) + fond OpenStreetMap
- * rendu par CARTO, avec repli sur les tuiles d'OpenStreetMap si CARTO ne répond pas. Affichée dans une WebView (Android/iOS) ou une iframe (aperçu web) : le même code partout,
+ * Carte interactive sans clé : Leaflet (embarqué dans l'app, aucun CDN à charger) + fond OpenStreetMap standard
+ * (rues, noms, parcs : lecture proche de Google Maps), avec repli sur le fond « World Street Map » d'Esri.
+ * CARTO n'est plus utilisé : ses fonds exigent désormais une clé (« API key required »). Affichée dans une WebView (Android/iOS) ou une iframe (aperçu web) : le même code partout,
  * y compris dans l'APK sans clé Google Maps.
  *
  * Protocole :
@@ -37,12 +38,12 @@ export type MapCommand =
 
 export type MapEvent = { type: 'ready' } | { type: 'tiles' } | { type: 'select'; id: string } | { type: 'pick'; lat: number; lng: number } | { type: 'error'; reason: string };
 
-/** Fond « Voyager » de CARTO (données OpenStreetMap) : gratuit, sans clé, lisible, attribution obligatoire. */
-const TILES = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
-const ATTRIBUTION = '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · © <a href="https://carto.com/attributions">CARTO</a>';
-/** Secours : tuiles standard d'OpenStreetMap (si CARTO est bloqué par le réseau). */
-const TILES_FALLBACK = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
-const ATTRIBUTION_FALLBACK = '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
+/** Fond standard d'OpenStreetMap : gratuit, sans clé (usage modéré, attribution obligatoire). */
+const TILES = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+const ATTRIBUTION = '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
+/** Secours : fond « World Street Map » d'Esri (sans clé), si OpenStreetMap ne répond pas. */
+const TILES_FALLBACK = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}';
+const ATTRIBUTION_FALLBACK = '© <a href="https://www.esri.com/">Esri</a> · © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
 
 export function buildMapHtml(center: GeoPoint, zoom: number): string {
   const init = JSON.stringify({ lat: center.latitude, lng: center.longitude, zoom });
@@ -54,7 +55,6 @@ export function buildMapHtml(center: GeoPoint, zoom: number): string {
 <style>
   html, body, #map { margin: 0; height: 100%; background: #F5F1EA; }
   .leaflet-container { background: #F5F1EA; font-family: -apple-system, Roboto, "Segoe UI", sans-serif; -webkit-tap-highlight-color: transparent; }
-  .leaflet-tile-pane { filter: sepia(0.15) saturate(0.92); }
   .leaflet-control-attribution { font-size: 9px; background: rgba(255,255,255,0.75) !important; }
   .pin { position: absolute; transform: translate(-50%, -50%); display: inline-flex; align-items: center; gap: 3px; white-space: nowrap;
          background: #fff; color: ${colors.ink}; border: 1px solid ${colors.border}; border-radius: 999px; padding: 6px 10px;
@@ -100,7 +100,7 @@ export function buildMapHtml(center: GeoPoint, zoom: number): string {
       })
       .addTo(map);
   }
-  addTiles('${TILES}', '${ATTRIBUTION}', 'abcd');
+  addTiles('${TILES}', '${ATTRIBUTION}', 'abc');
 
   function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function icon(html) { return L.divIcon({ className: '', html: html, iconSize: [0, 0] }); }

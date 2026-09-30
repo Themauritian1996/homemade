@@ -6,7 +6,7 @@ import { conversations as demoConversations, messages as demoMessages, DEMO_USER
 import type { Conversation, Message } from '@/types';
 import { photoUrl } from './meals';
 
-const MESSAGE_COLUMNS = 'id, conversationId:conversation_id, senderId:sender_id, body, kind, createdAt:created_at';
+const MESSAGE_COLUMNS = 'id, conversationId:conversation_id, senderId:sender_id, body, kind, createdAt:created_at, masked';
 
 export async function fetchConversations(): Promise<Conversation[]> {
   if (DEMO_MODE) return demoConversations;
@@ -61,8 +61,16 @@ export function subscribeToConversation(conversationId: string, onMessage: (m: M
   const channel = sb
     .channel(`conv:${conversationId}`)
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${conversationId}` }, (payload) => {
-      const r = payload.new as Record<string, string>;
-      onMessage({ id: r.id, conversationId: r.conversation_id, senderId: r.sender_id, body: r.body, kind: r.kind as Message['kind'], createdAt: r.created_at });
+      const r = payload.new as Record<string, string | boolean>;
+      onMessage({
+        id: String(r.id),
+        conversationId: String(r.conversation_id),
+        senderId: String(r.sender_id),
+        body: String(r.body),
+        kind: r.kind as Message['kind'],
+        createdAt: String(r.created_at),
+        masked: r.masked === true,
+      });
     })
     .subscribe();
   return () => {

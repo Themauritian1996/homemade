@@ -161,6 +161,8 @@ export interface Message {
   body: string;
   kind: 'text' | 'system';
   createdAt: string;
+  /** Coordonnées ou paiement hors app masqués par le serveur. */
+  masked?: boolean;
 }
 
 export interface Review {

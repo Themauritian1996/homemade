@@ -1,10 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, Share, StyleSheet, Switch, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AddressSection } from '@/components/AddressSection';
 import { LanguageToggle } from '@/components/LanguageToggle';
+import { PaymentsSection } from '@/components/PaymentsSection';
 import { Avatar, Button, Card, Chip, Divider, ListRow, ScreenHeader, TextField } from '@/components/ui';
 import { DEMO_MODE } from '@/lib/config';
 import { friendlyError } from '@/lib/errors';
@@ -18,6 +20,8 @@ const RADII = [2, 5, 10, 15, 25];
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
+  // Retour du formulaire Stripe : homemade://settings?payments=done → statut rafraîchi.
+  const params = useLocalSearchParams<{ payments?: string }>();
   const user = useApp((s) => s.user);
   const setUser = useApp((s) => s.setUser);
   const setFilters = useApp((s) => s.setFilters);
@@ -142,14 +146,6 @@ export default function SettingsScreen() {
             icon="person-outline"
           />
           <TextField
-            label={t('Quartier')}
-            value={profile.neighborhood}
-            onChangeText={(neighborhood) => setProfile({ ...profile, neighborhood })}
-            placeholder={t('Ex. Rosemont')}
-            maxLength={80}
-            icon="home-outline"
-          />
-          <TextField
             label={t('À propos de moi')}
             value={profile.bio}
             onChangeText={(bio) => setProfile({ ...profile, bio })}
@@ -159,6 +155,14 @@ export default function SettingsScreen() {
             style={{ minHeight: 80, textAlignVertical: 'top' }}
           />
           <Button title={t('Enregistrer le profil')} onPress={submitProfile} loading={savingProfile} size="md" />
+        </Section>
+
+        <Section title={t('Adresse de cueillette (privée)')}>
+          <AddressSection />
+        </Section>
+
+        <Section title={t('Paiements')}>
+          <PaymentsSection refreshKey={params.payments} />
         </Section>
 
         <Section title={t('Langue · Language')}>

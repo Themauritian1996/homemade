@@ -7,6 +7,7 @@ import { FilterSheet } from '@/components/FilterSheet';
 import { LeafletMap, LeafletMapHandle } from '@/components/LeafletMap';
 import { MealCard } from '@/components/MealCard';
 import { NearbyList } from '@/components/NearbyList';
+import { ZoneSearch } from '@/components/ZoneSearch';
 import { Button, Chip } from '@/components/ui';
 import { formatPrice } from '@/lib/format';
 import { useFeed } from '@/lib/useFeed';
@@ -41,6 +42,8 @@ function InteractiveMap({ onShowList, onError }: { onShowList: () => void; onErr
   const { filters, setFilters, location, hasRealLocation, setLocation } = useApp();
   const [selected, setSelected] = useState<string | null>(null);
   const [sheet, setSheet] = useState(false);
+  const [zoneOpen, setZoneOpen] = useState(false);
+  const [zone, setZone] = useState<string | null>(null);
   const cardWidth = width - spacing.xl * 2;
 
   useEffect(() => {
@@ -117,12 +120,12 @@ function InteractiveMap({ onShowList, onError }: { onShowList: () => void; onErr
 
       <View style={[styles.topOverlay, { top: insets.top + spacing.sm }]} pointerEvents="box-none">
         <View style={styles.row} pointerEvents="box-none">
-          <View style={styles.searchPill}>
-            <Ionicons name="location" size={16} color={colors.tomato} />
+          <Pressable style={styles.searchPill} onPress={() => setZoneOpen(true)} accessibilityRole="button" accessibilityLabel={t('Chercher autour de…')}>
+            <Ionicons name="search" size={16} color={colors.tomato} />
             <Text style={styles.searchText} numberOfLines={1}>
-              {loading ? t('Recherche…') : t('{0} repas dans un rayon de {1} km', { 0: meals.length, 1: filters.radiusKm })}
+              {loading ? t('Recherche…') : `${zone ? `${zone} · ` : ''}${t('{0} repas dans un rayon de {1} km', { 0: meals.length, 1: filters.radiusKm })}`}
             </Text>
-          </View>
+          </Pressable>
           <Pressable style={styles.roundBtn} onPress={onShowList} accessibilityRole="button" accessibilityLabel={t('Afficher la liste')}>
             <Ionicons name="list-outline" size={20} color={colors.ink} />
           </Pressable>
@@ -200,6 +203,14 @@ function InteractiveMap({ onShowList, onError }: { onShowList: () => void; onErr
         )}
       />
       <FilterSheet visible={sheet} value={filters} onClose={() => setSheet(false)} onApply={(f) => setFilters(f)} />
+      <ZoneSearch
+        visible={zoneOpen}
+        onClose={() => setZoneOpen(false)}
+        onFound={(p, label) => {
+          setZone(label);
+          mapRef.current?.flyTo(p, 14);
+        }}
+      />
     </View>
   );
 }

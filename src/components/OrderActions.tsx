@@ -5,8 +5,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { Alert, Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { friendlyError } from '@/lib/errors';
+import { fetchPickupDetails, PickupDetails } from '@/services/address';
 import { fetchOrder, OrderAction, OrderSummary, transitionOrder } from '@/services/orders';
 import { colors, fonts, radius, spacing } from '@/theme';
 import { Button } from './ui';
@@ -46,12 +47,22 @@ function actionsFor(o: OrderSummary, me: string): ActionDef[] {
 export function OrderActions({ orderId, me, refreshKey }: { orderId: string; me: string; refreshKey: number }) {
   const [order, setOrder] = useState<OrderSummary | null>(null);
   const [busy, setBusy] = useState(false);
+  const [pickup, setPickup] = useState<PickupDetails | null>(null);
 
   const load = useCallback(() => {
     fetchOrder(orderId).then(setOrder).catch(() => {});
   }, [orderId]);
   // Rechargé à chaque nouveau message (les changements d'état publient un message système).
   useEffect(load, [load, refreshKey]);
+
+  // Adresse exacte : fournie par le serveur seulement une fois la commande acceptée (et payée pour un achat).
+  const revealed = order ? ['accepted', 'ready', 'picked_up'].includes(order.status) : false;
+  useEffect(() => {
+    if (!revealed) return setPickup(null);
+    fetchPickupDetails(orderId)
+      .then(setPickup)
+      .catch(() => setPickup(null));
+  }, [revealed, orderId]);
 
   if (!order) return null;
 
@@ -78,6 +89,19 @@ export function OrderActions({ orderId, me, refreshKey }: { orderId: string; me:
           {order.kind === 'swap' ? t('Échange') : t('Commande')} · {STATUS_LABEL[order.status] ? t(STATUS_LABEL[order.status]) : order.status}
         </Text>
       </View>
+      {pickup && (
+        <Pressable onPress={() => openDirections(pickup)} style={styles.pickup} accessibilityRole="button" accessibilityLabel={t('Itinéraire')}>
+          <Ionicons name="location" size={18} color={colors.tomato} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.pickupTitle}>{pickup.address ?? t('Point de cueillette exact')}</Text>
+            <Text style={styles.pickupSub}>{[pickup.postalCode, t('Toucher pour l’itinéraire')].filter(Boolean).join(' · ')}</Text>
+          </View>
+          <Ionicons name="navigate-outline" size={18} color={colors.forest} />
+        </Pressable>
+      )}
+      {!pickup && order.status === 'paid' && me === order.eaterId && (
+        <Text style={styles.pickupSub}>{t('L’adresse exacte s’affichera ici dès que le Cooker aura accepté.')}</Text>
+      )}
       {actions.length > 0 && (
         <View style={styles.row}>
           {actions.map((a) => (
@@ -89,7 +113,20 @@ export function OrderActions({ orderId, me, refreshKey }: { orderId: string; me:
   );
 }
 
+/** Ouvre l'itinéraire dans l'app de cartes du téléphone (Google Maps sur Android). */
+function openDirections(p: PickupDetails) {
+  const q = p.address ? encodeURIComponent(`${p.address}${p.postalCode ? `, ${p.postalCode}` : ''}`) : `${p.latitude},${p.longitude}`;
+  const url =
+    Platform.OS === 'ios'
+      ? `http://maps.apple.com/?daddr=${q}`
+      : `https://www.google.com/maps/dir/?api=1&destination=${p.address ? q : `${p.latitude},${p.longitude}`}`;
+  Linking.openURL(url).catch(() => {});
+}
+
 const styles = StyleSheet.create({
+  pickup: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md },
+  pickupTitle: { fontFamily: fonts.semibold, fontSize: 14, color: colors.ink },
+  pickupSub: { fontFamily: fonts.regular, fontSize: 12, color: colors.inkSoft },
   bar: { backgroundColor: colors.sage, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, gap: spacing.sm, borderBottomLeftRadius: radius.md, borderBottomRightRadius: radius.md },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   label: { flex: 1, fontFamily: fonts.semibold, fontSize: 13, color: colors.forest },

@@ -146,7 +146,7 @@ export async function sendFeedback(userId: string, f: { kind: FeedbackKind; mess
   if (error) throw error;
 }
 
-export type ReportReason = 'allergen_incident' | 'hygiene' | 'no_show' | 'misleading' | 'fraud' | 'harassment' | 'other';
+export type ReportReason = 'allergen_incident' | 'hygiene' | 'no_show' | 'misleading' | 'fraud' | 'off_platform' | 'harassment' | 'other';
 
 /** Un signalement « incident allergène » ou « hygiène » suspend le plat immédiatement (trigger serveur). */
 export async function sendReport(userId: string, r: { reason: ReportReason; details: string; mealId?: string; subjectId?: string; orderId?: string }) {

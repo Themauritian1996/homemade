@@ -34,7 +34,7 @@ for (const file of files) {
   visit(sf);
 }
 // Noms propres ou identiques dans les deux langues.
-const SAME = new Set(['Homemade', 'Canceled', 'Meal prep', 'Messages', 'Description', 'Distance', 'Mode', 'Dessert', 'Cooker', 'Eater']);
+const SAME = new Set(['H2J 1A1', 'HomemadeBeta/1.0 (+https://github.com/Themauritian1996/homemade)', 'Homemade', 'Canceled', 'Meal prep', 'Messages', 'Description', 'Distance', 'Mode', 'Dessert', 'Cooker', 'Eater']);
 
 const enSrc = fs.readFileSync(path.join(ROOT, 'src/i18n/en.ts'), 'utf8');
 const enSf = ts.createSourceFile('en.ts', enSrc, ts.ScriptTarget.Latest, true);
