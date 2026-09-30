@@ -84,4 +84,7 @@ jobs:
 
       - name: Fonction d'analyse IA
         if: ${{ !inputs.dry_run }}
-        run: supabase functions deploy analyze-meal --project-ref "$SUPABASE_PROJECT_REF"
+        run: |
+          # Envoi par l'API (le serveur Supabase assemble la fonction) ; sinon assemblage local (Docker), en mode détaillé.
+          supabase functions deploy analyze-meal --project-ref "$SUPABASE_PROJECT_REF" --use-api \
+            || supabase functions deploy analyze-meal --project-ref "$SUPABASE_PROJECT_REF" --debug
