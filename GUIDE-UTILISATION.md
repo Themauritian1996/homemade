@@ -23,6 +23,8 @@ Tout fonctionne **gratuitement** : la base de données (Supabase, offre gratuite
 
 Tu vas seulement **copier-coller des clés** dans des pages web. GitHub fait ensuite tout le travail technique : mettre à jour la base de données, installer l'IA et fabriquer l'APK.
 
+Obligatoire : **3 secrets** (`GEMINI_API_KEY`, `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD`). Facultatif : `GROQ_API_KEY`.
+
 > 🔐 Les clés sont des mots de passe : ne les envoie à personne, ne les colle jamais dans un fichier du projet. On les range uniquement dans les **Secrets** de GitHub (Étape 2), qui sont chiffrés et invisibles.
 
 ## Étape 1 — Obtenir une clé d'IA gratuite (5 min)
@@ -60,20 +62,17 @@ Tu vas seulement **copier-coller des clés** dans des pages web. GitHub fait ens
 
 3. Clique ensuite l'onglet **Variables** (même page) et vérifie que **`EXPO_PUBLIC_SUPABASE_URL`** et **`EXPO_PUBLIC_SUPABASE_ANON_KEY`** existent déjà (elles servent à l'APK depuis le début). S'il en manque une : Supabase → ⚙️ **Project Settings** → **API** → copie *Project URL* et la clé *anon / publishable*, puis **New repository variable**.
 
-## Étape 3 — Publier la nouvelle version (5 min, puis 25 min d'attente)
+## Étape 3 — Lancer la mise à jour du serveur (2 min, puis 3 min d'attente)
 
-Les nouveautés sont prêtes sur une branche de travail. Il faut les faire entrer dans la branche principale (`main`) :
-1. Va sur **https://github.com/Themauritian1996/homemade/pulls** → **New pull request**.
-2. En haut : *base* = **main**, *compare* = **ccr-2cce76bb-78cru9** → **Create pull request** → encore **Create pull request**.
-3. Clique **Merge pull request** → **Confirm merge**.
+La nouvelle version est déjà dans la branche principale (`main`) : l'APK se fabrique tout seul (≈ 25 min, robot **APK Android**).
+Une fois tes clés rangées (Étape 2), lance le robot du serveur :
+1. Va sur **https://github.com/Themauritian1996/homemade/actions/workflows/supabase-deploy.yml**
+2. À droite, clique **Run workflow**, puis le bouton vert **Run workflow**.
+3. Attends ≈ 3 minutes : une ✅ verte = base de données à jour, clé d'IA installée, fonction d'IA en ligne.
 
-GitHub lance alors automatiquement deux robots (onglet **Actions**) :
-- **Serveur Supabase** (≈ 3 min) : met à jour la base de données, range la clé d'IA côté serveur, installe la fonction d'IA.
-- **APK Android** (≈ 25 min) : fabrique l'application et la publie dans **Releases**.
+Si une ❌ rouge apparaît : clique dessus, puis sur l'étape en rouge ; le message indique ce qui manque (souvent un secret mal nommé). Corrige-le, puis **Re-run jobs**.
 
-Quand les deux ont une ✅ verte, c'est prêt. Si une ❌ rouge apparaît : clique dessus, puis sur l'étape en rouge ; le message dit en français ce qui manque (souvent un secret mal nommé). Corrige-le, puis **Re-run jobs**.
-
-> Pour relancer un robot à la main plus tard : **Actions** → choisis-le à gauche → **Run workflow**.
+> Plus tard, chaque changement du serveur relance ce robot automatiquement. Tu peux aussi le relancer à la main de la même façon.
 
 ## Étape 4 — Rendre l'APK téléchargeable par tes testeurs (2 à 10 min)
 
