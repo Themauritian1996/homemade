@@ -169,3 +169,20 @@ jobs:
             --notes-file notes.md \
             --latest
           echo "Lien pour tes testeurs : https://github.com/$PUBLIC_REPO/releases/latest/download/Homemade.apk"
+
+      # APK « émulateur » (processeur x86_64 des serveurs GitHub), NON publiée : sert uniquement au robot
+      # « Test Android (émulateur) ». L'APK des testeurs, elle, vise les vrais téléphones (ARM) et reste légère.
+      - name: APK de test pour l'émulateur (x86_64)
+        continue-on-error: true
+        working-directory: android
+        run: |
+          ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=x86_64
+          cp app/build/outputs/apk/release/app-release.apk ../Homemade-emulateur.apk
+
+      - uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: apk-emulateur
+          path: Homemade-emulateur.apk
+          retention-days: 7
+          if-no-files-found: ignore
