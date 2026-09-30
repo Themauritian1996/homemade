@@ -1,20 +1,20 @@
-# Met à jour le serveur Supabase SANS terminal : base de données (migrations), clés d'IA gratuites, Edge Functions.
+# Met à jour le serveur Supabase SANS terminal : base de données (migrations + référentiels), réglages d'inscription,
+# clés d'IA gratuites, fonction d'analyse IA. Tout passe par l'API de gestion de Supabase avec un seul jeton.
 # Déclenchement : à chaque mise à jour de main qui touche supabase/, ou à la main
 # (onglet Actions → « Serveur Supabase » → Run workflow).
 #
-# À configurer UNE fois dans GitHub → Settings → Secrets and variables → Actions :
-#   Secrets   : SUPABASE_ACCESS_TOKEN (supabase.com/dashboard/account/tokens)
-#               SUPABASE_DB_PASSWORD  (mot de passe de la base, Project Settings → Database)
-#               GEMINI_API_KEY        (aistudio.google.com/apikey — gratuit)
-#               GROQ_API_KEY          (facultatif, console.groq.com/keys — gratuit, secours)
-#   Variable  : EXPO_PUBLIC_SUPABASE_URL (déjà utilisée par l'APK : l'identifiant du projet en est déduit)
+# À configurer UNE fois dans GitHub → Settings → Secrets and variables → Actions → Secrets :
+#   SUPABASE_ACCESS_TOKEN  jeton du compte qui possède le projet (supabase.com/dashboard/account/tokens)
+#   GEMINI_API_KEY         clé gratuite Google AI Studio (aistudio.google.com/apikey)
+#   GROQ_API_KEY           facultatif, secours gratuit (console.groq.com/keys)
+# Projet : homemade au Canada (lcpoxseqtabauemymlss) ; autre projet possible via la variable SUPABASE_PROJECT_REF.
 name: Serveur Supabase
 
 on:
   workflow_dispatch:
     inputs:
       project_ref:
-        description: "Identifiant du projet Supabase (laisser vide = celui de l'app, variable EXPO_PUBLIC_SUPABASE_URL)"
+        description: "Identifiant du projet Supabase (laisser vide = projet de l'app)"
         required: false
         default: ''
       dry_run:
@@ -25,6 +25,7 @@ on:
     branches: [main]
     paths:
       - 'supabase/**'
+      - 'scripts/supabase-deploy.mjs'
       - '.github/workflows/supabase-deploy.yml'
 
 concurrency:
@@ -37,8 +38,7 @@ jobs:
     timeout-minutes: 20
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-      SUPABASE_URL_VAR: ${{ vars.EXPO_PUBLIC_SUPABASE_URL }}
+      SUPABASE_PROJECT_REF: ${{ inputs.project_ref || vars.SUPABASE_PROJECT_REF || 'lcpoxseqtabauemymlss' }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
       AI_CUSTOM_URL: ${{ secrets.AI_CUSTOM_URL }}
@@ -47,69 +47,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
       - uses: supabase/setup-cli@v1
         with:
           version: latest
 
-      - name: Vérification de la configuration
-        id: cfg
+      - name: Diagnostic (jeton, projet, migrations)
         run: |
-          missing=""
-          [ -n "$SUPABASE_ACCESS_TOKEN" ] || missing="$missing SUPABASE_ACCESS_TOKEN"
-          [ -n "$SUPABASE_DB_PASSWORD" ] || missing="$missing SUPABASE_DB_PASSWORD"
-          [ -n "$SUPABASE_URL_VAR" ] || missing="$missing EXPO_PUBLIC_SUPABASE_URL(variable)"
-          if [ -n "$missing" ]; then
-            echo "::error::Configuration manquante :$missing — voir GUIDE-UTILISATION.md, Étape 2."
-            exit 1
-          fi
-          ref="${{ inputs.project_ref }}"
-          [ -n "$ref" ] || ref=$(echo "$SUPABASE_URL_VAR" | sed -E 's#^https?://([^.]+)\.supabase\.co.*#\1#')
-          echo "ref=$ref" >> "$GITHUB_OUTPUT"
-          echo "Projet Supabase : $ref"
           [ -n "$GEMINI_API_KEY$GROQ_API_KEY$AI_CUSTOM_URL" ] || echo "::warning::Aucune clé d'IA gratuite (GEMINI_API_KEY…) : l'app fonctionnera en saisie manuelle."
+          node scripts/supabase-deploy.mjs check
 
-      - name: Vérification du jeton Supabase (diagnostic, n'affiche aucune clé)
-        env:
-          REF: ${{ steps.cfg.outputs.ref }}
-        run: |
-          code=$(curl -sS -o projects.json -w '%{http_code}' -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" https://api.supabase.com/v1/projects)
-          echo "Réponse de Supabase à la liste des projets : HTTP $code"
-          if [ "$code" = "401" ]; then
-            echo "::error::Le jeton SUPABASE_ACCESS_TOKEN est invalide ou expiré. Recrée-le sur supabase.com/dashboard/account/tokens."
-            exit 1
-          fi
-          if [ "$code" != "200" ]; then
-            echo "Détail : $(head -c 300 projects.json)"
-            echo "::error::Ce jeton n'a pas le droit de lister les projets (HTTP $code). Recrée-le avec tous les droits (voir le guide)."
-            exit 1
-          fi
-          echo "Projets visibles avec ce jeton :"
-          jq -r '.[] | "  - \(.name)  (identifiant \(.id), statut \(.status), organisation \(.organization_id))"' projects.json
-          if ! jq -e --arg ref "$REF" 'any(.[]; .id == $ref)' projects.json > /dev/null; then
-            echo "::error::Le projet $REF n'est PAS visible avec ce jeton : il a été créé depuis un autre compte Supabase. Connecte-toi au compte qui possède le projet Homemade, recrée le jeton, puis remplace le secret SUPABASE_ACCESS_TOKEN."
-            exit 1
-          fi
-          code=$(curl -sS -o project.json -w '%{http_code}' -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" "https://api.supabase.com/v1/projects/$REF")
-          echo "Accès au projet $REF : HTTP $code — $(jq -r '.status // .message // empty' project.json 2>/dev/null | head -c 200)"
-          code_org=$(curl -sS -o orgs.json -w '%{http_code}' -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" https://api.supabase.com/v1/organizations)
-          echo "Organisations visibles (HTTP $code_org) :"
-          jq -r '.[]? | "  - \(.name) (\(.id))"' orgs.json 2>/dev/null || true
-          for path in secrets functions api-keys; do
-            c=$(curl -sS -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" "https://api.supabase.com/v1/projects/$REF/$path")
-            echo "Droit « $path » : HTTP $c"
-          done
-
-      - name: Liaison au projet
-        run: supabase link --project-ref "${{ steps.cfg.outputs.ref }}"
-
-      - name: État des migrations (déjà appliquées ou non)
-        run: supabase migration list
-
-      - name: Base de données (nouvelles migrations seulement)
+      - name: Base de données (migrations manquantes + référentiels)
         if: ${{ !inputs.dry_run }}
-        # « y » répond à la confirmation de la CLI (aucune donnée n'est effacée : migrations additives).
-        # Le seed (référentiels) est idempotent : sans effet s'il est déjà appliqué, indispensable sur un projet neuf.
-        run: echo y | supabase db push --include-seed
+        run: node scripts/supabase-deploy.mjs migrate
+
+      - name: Réglages d'inscription (bêta)
+        if: ${{ !inputs.dry_run }}
+        run: node scripts/supabase-deploy.mjs auth
 
       - name: Clés d'IA (secrets serveur, jamais dans l'app)
         if: ${{ !inputs.dry_run }}
@@ -120,11 +77,11 @@ jobs:
             if [ -n "$value" ]; then args+=("$name=$value"); fi
           done
           if [ ${#args[@]} -gt 0 ]; then
-            supabase secrets set --project-ref "${{ steps.cfg.outputs.ref }}" "${args[@]}"
+            supabase secrets set --project-ref "$SUPABASE_PROJECT_REF" "${args[@]}"
           else
             echo "Aucune clé à enregistrer."
           fi
 
       - name: Fonction d'analyse IA
         if: ${{ !inputs.dry_run }}
-        run: supabase functions deploy analyze-meal --project-ref "${{ steps.cfg.outputs.ref }}"
+        run: supabase functions deploy analyze-meal --project-ref "$SUPABASE_PROJECT_REF"
