@@ -56,10 +56,23 @@ function nodes(xml) {
   });
 }
 
+/** Fenêtre système de l'émulateur (« Pixel Launcher isn't responding ») : on la ferme avec « Wait ». */
+function dismissSystemDialog(list) {
+  if (!list.some((n) => /isn.t responding|ne répond pas/i.test(n.text))) return false;
+  const wait = list.find((n) => /^(Wait|Attendre)$/i.test(n.text));
+  if (wait) adb('shell', 'input', 'tap', String(Math.round(wait.x)), String(Math.round(wait.y)));
+  return true;
+}
+
 async function find(re, { timeout = 20_000, cls } = {}) {
   const until = Date.now() + timeout;
   while (Date.now() < until) {
-    const hit = nodes(dump()).find((n) => (!cls || n.cls.includes(cls)) && (re.test(n.text) || re.test(n.desc)));
+    const list = nodes(dump());
+    if (dismissSystemDialog(list)) {
+      await sleep(1000);
+      continue;
+    }
+    const hit = list.find((n) => (!cls || n.cls.includes(cls)) && (re.test(n.text) || re.test(n.desc)));
     if (hit) return hit;
     await sleep(1000);
   }
@@ -110,8 +123,12 @@ try {
   adb('logcat', '-c');
   adb('shell', 'monkey', '-p', PKG, '-c', 'android.intent.category.LAUNCHER', '1');
 
-  // Accueil
-  const welcome = await find(/déjà un compte|already have an account/i, { timeout: 60_000 });
+  // Accueil (relance une fois si le lanceur de l'émulateur a gêné le démarrage)
+  let welcome = await find(/déjà un compte|already have an account/i, { timeout: 60_000 });
+  if (!welcome) {
+    adb('shell', 'monkey', '-p', PKG, '-c', 'android.intent.category.LAUNCHER', '1');
+    welcome = await find(/déjà un compte|already have an account/i, { timeout: 45_000 });
+  }
   step(Boolean(welcome), 'Écran d’accueil affiché');
   shot('accueil');
 

@@ -12,6 +12,7 @@ on:
 
 permissions:
   contents: write
+  actions: read
 
 concurrency:
   group: android-e2e
@@ -33,10 +34,16 @@ jobs:
         with:
           node-version: 22
 
-      - name: Dernière APK publiée
+      # Même code que l'APK publiée, compilé pour le processeur x86_64 de l'émulateur (artifact « apk-emulateur »).
+      - name: APK à tester (version émulateur de la dernière APK)
         run: |
-          gh release download --repo "${{ github.repository }}" --pattern Homemade.apk --clobber
-          gh release view --repo "${{ github.repository }}" --json tagName,name --jq '"Version testée : " + .name + " (" + .tagName + ")"'
+          RUN_ID="${{ github.event.workflow_run.id }}"
+          if [ -z "$RUN_ID" ]; then
+            RUN_ID=$(gh run list --repo "${{ github.repository }}" --workflow android-apk.yml --status success --limit 1 --json databaseId --jq '.[0].databaseId')
+          fi
+          echo "APK Android : run $RUN_ID"
+          gh run download "$RUN_ID" --repo "${{ github.repository }}" --name apk-emulateur
+          mv Homemade-emulateur.apk Homemade.apk
           ls -lh Homemade.apk
 
       - name: Compte robot temporaire

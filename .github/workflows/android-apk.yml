@@ -88,6 +88,20 @@ jobs:
       - name: Vérification TypeScript
         run: npx tsc --noEmit
 
+      # Numéro de la version de test dans l'app (Profil, tout en bas : « v1.0.0 (N) ») et pour Android (versionCode) :
+      # chaque APK remplace proprement la précédente et on voit tout de suite laquelle est installée.
+      - name: Numéro de version
+        run: |
+          node -e "
+            const fs = require('fs');
+            const app = JSON.parse(fs.readFileSync('app.json', 'utf8'));
+            const n = Number(process.env.GITHUB_RUN_NUMBER);
+            app.expo.android = { ...app.expo.android, versionCode: n };
+            app.expo.extra = { ...app.expo.extra, buildNumber: n };
+            fs.writeFileSync('app.json', JSON.stringify(app, null, 2));
+            console.log('Version de test n°' + n);
+          "
+
       - name: Génération du projet Android natif
         run: npx expo prebuild --platform android --no-install --clean
 
@@ -121,6 +135,8 @@ jobs:
           4. Ouvre l'app → **Créer un compte** → entre le **code d'invitation** reçu.
 
           Mise à jour : installe simplement la nouvelle version par-dessus, ton compte est conservé.
+          Version installée : **Profil**, tout en bas → « v1.0.0 (${GITHUB_RUN_NUMBER}) » pour cette version.
+          Le téléphone rouvre l'ancien fichier ? Supprime les anciens « Homemade.apk » de **Téléchargements**, ou prends **Homemade-test-${GITHUB_RUN_NUMBER}.apk** ci-dessous.
           Langue : touche **FR / EN** en haut de l'accueil (ou Profil → Paramètres). _English available: tap FR / EN._
 
           _Version de test n°${GITHUB_RUN_NUMBER} · ${GITHUB_SHA::7}_
@@ -153,3 +169,20 @@ jobs:
             --notes-file notes.md \
             --latest
           echo "Lien pour tes testeurs : https://github.com/$PUBLIC_REPO/releases/latest/download/Homemade.apk"
+
+      # APK « émulateur » (processeur x86_64 des serveurs GitHub), NON publiée : sert uniquement au robot
+      # « Test Android (émulateur) ». L'APK des testeurs, elle, vise les vrais téléphones (ARM) et reste légère.
+      - name: APK de test pour l'émulateur (x86_64)
+        continue-on-error: true
+        working-directory: android
+        run: |
+          ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=x86_64
+          cp app/build/outputs/apk/release/app-release.apk ../Homemade-emulateur.apk
+
+      - uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: apk-emulateur
+          path: Homemade-emulateur.apk
+          retention-days: 7
+          if-no-files-found: ignore
