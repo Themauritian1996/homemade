@@ -9,6 +9,7 @@ import { FeedbackKind, sendFeedback } from '@/services/account';
 import { useApp } from '@/store/app';
 import { colors, fonts, radius, spacing, type } from '@/theme';
 
+import { t } from '@/i18n';
 const KINDS: { id: FeedbackKind; label: string; emoji: string; placeholder: string }[] = [
   { id: 'bug', label: 'Un bogue', emoji: '🐞', placeholder: 'Qu’avez-vous fait, et que s’est-il passé ? (écran, bouton, message d’erreur…)' },
   { id: 'idea', label: 'Une idée', emoji: '💡', placeholder: 'Qu’est-ce qui rendrait Homemade plus utile pour vous ?' },
@@ -29,10 +30,10 @@ export default function Feedback() {
     setSending(true);
     try {
       await sendFeedback(user.id, { kind, message });
-      Alert.alert('Merci ! 🙏', 'Votre message a bien été transmis. Chaque retour compte pendant la bêta.');
+      Alert.alert(t('Merci ! 🙏'), t('Votre message a bien été transmis. Chaque retour compte pendant la bêta.'));
       router.back();
     } catch (e) {
-      Alert.alert('Envoi impossible', friendlyError(e));
+      Alert.alert(t('Envoi impossible'), friendlyError(e));
     } finally {
       setSending(false);
     }
@@ -40,28 +41,28 @@ export default function Feedback() {
 
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScreenHeader title="Votre avis sur la bêta" modal />
+      <ScreenHeader title={t('Votre avis sur la bêta')} modal />
       <ScrollView
         contentContainerStyle={{ padding: spacing.xl, paddingTop: spacing.sm, gap: spacing.lg, paddingBottom: insets.bottom + spacing.huge }}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={type.body}>Vous faites partie des premiers testeurs : dites-nous tout, même les petits détails.</Text>
+        <Text style={type.body}>{t('Vous faites partie des premiers testeurs : dites-nous tout, même les petits détails.')}</Text>
         <View style={styles.wrap}>
           {KINDS.map((k) => (
-            <Chip key={k.id} emoji={k.emoji} label={k.label} selected={kind === k.id} onPress={() => setKind(k.id)} />
+            <Chip key={k.id} emoji={k.emoji} label={t(k.label)} selected={kind === k.id} onPress={() => setKind(k.id)} />
           ))}
         </View>
         <TextInput
           value={message}
           onChangeText={setMessage}
-          placeholder={current.placeholder}
+          placeholder={t(current.placeholder)}
           placeholderTextColor={colors.muted}
           multiline
           maxLength={2000}
           style={styles.input}
           autoFocus
         />
-        <Button title="Envoyer" icon="send-outline" onPress={submit} loading={sending} disabled={message.trim().length < 3} />
+        <Button title={t('Envoyer')} icon="send-outline" onPress={submit} loading={sending} disabled={message.trim().length < 3} />
       </ScrollView>
     </KeyboardAvoidingView>
   );

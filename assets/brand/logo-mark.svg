@@ -1,0 +1,13 @@
+<!-- Marque Homemade : un toit (la maison) au-dessus d'un bol fumant (le repas). Palette « Warm Editorial ». -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <g transform="translate(0 -2)" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <path d="M19 48 L50 21 L81 48" stroke="#E2553B" stroke-width="7.5"/>
+    <g stroke="#F2B441" stroke-width="3.6">
+      <path d="M41 47 C37.5 43.5 44.5 41 41 37"/>
+      <path d="M50 47 C46 42.5 54 39.5 50 33"/>
+      <path d="M59 47 C55.5 43.5 62.5 41 59 37"/>
+    </g>
+    <path d="M23 54 H77 A27 27 0 0 1 23 54 Z" fill="#FAF6EF" stroke="none"/>
+    <path d="M40 80 H60" stroke="#FAF6EF" stroke-width="6"/>
+  </g>
+</svg>

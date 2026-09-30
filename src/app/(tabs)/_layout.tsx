@@ -3,14 +3,20 @@ import { Tabs } from 'expo-router';
 import React from 'react';
 import { ColorValue, Platform, StyleSheet, View } from 'react-native';
 import { useSessionSync } from '@/lib/useSessionSync';
+import { t } from '@/i18n';
 import { useApp } from '@/store/app';
-import { colors, fonts, shadow } from '@/theme';
+import { colors, fonts, radius, shadow } from '@/theme';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
+// Onglet actif : icône pleine sur une pastille vert sauge (indicateur moderne façon Material 3).
 const icon =
   (active: IconName, inactive: IconName) =>
-  ({ focused, color }: { focused: boolean; color: ColorValue }) => <Ionicons name={focused ? active : inactive} size={23} color={color} />;
+  ({ focused, color }: { focused: boolean; color: ColorValue }) => (
+    <View style={[styles.indicator, focused && styles.indicatorActive]}>
+      <Ionicons name={focused ? active : inactive} size={22} color={color} />
+    </View>
+  );
 
 export default function TabsLayout() {
   useSessionSync();
@@ -21,23 +27,26 @@ export default function TabsLayout() {
         headerShown: false,
         tabBarActiveTintColor: colors.forest,
         tabBarInactiveTintColor: colors.muted,
-        tabBarLabelStyle: { fontFamily: fonts.medium, fontSize: 11 },
+        tabBarLabelStyle: { fontFamily: fonts.semibold, fontSize: 11, marginTop: 2 },
         tabBarStyle: {
           backgroundColor: colors.surface,
-          borderTopColor: colors.border,
-          height: Platform.OS === 'ios' ? 88 : 68,
-          paddingTop: 6,
+          borderTopWidth: 0,
+          borderTopLeftRadius: radius.xl,
+          borderTopRightRadius: radius.xl,
+          height: Platform.OS === 'ios' ? 90 : 72,
+          paddingTop: 8,
           paddingBottom: Platform.OS === 'ios' ? 28 : 10,
+          ...shadow.floating,
         },
         sceneStyle: { backgroundColor: colors.bg },
       }}
     >
-      <Tabs.Screen name="index" options={{ title: 'Découvrir', tabBarIcon: icon('restaurant', 'restaurant-outline') }} />
-      <Tabs.Screen name="map" options={{ title: 'Carte', tabBarIcon: icon('map', 'map-outline') }} />
+      <Tabs.Screen name="index" options={{ title: t('Découvrir'), tabBarIcon: icon('restaurant', 'restaurant-outline') }} />
+      <Tabs.Screen name="map" options={{ title: t('Carte'), tabBarIcon: icon('map', 'map-outline') }} />
       <Tabs.Screen
         name="publish"
         options={{
-          title: 'Publier',
+          title: t('Publier'),
           tabBarIcon: () => (
             <View style={styles.fab}>
               <Ionicons name="camera" size={24} color={colors.onDark} />
@@ -49,18 +58,20 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="inbox"
         options={{
-          title: 'Messages',
+          title: t('Messages'),
           tabBarIcon: icon('chatbubbles', 'chatbubbles-outline'),
           tabBarBadge: unread > 0 ? (unread > 9 ? '9+' : unread) : undefined,
           tabBarBadgeStyle: { backgroundColor: colors.tomato },
         }}
       />
-      <Tabs.Screen name="profile" options={{ title: 'Profil', tabBarIcon: icon('person-circle', 'person-circle-outline') }} />
+      <Tabs.Screen name="profile" options={{ title: t('Profil'), tabBarIcon: icon('person-circle', 'person-circle-outline') }} />
     </Tabs>
   );
 }
 
 const styles = StyleSheet.create({
+  indicator: { width: 56, height: 30, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
+  indicatorActive: { backgroundColor: colors.sage },
   fab: {
     width: 52,
     height: 52,
@@ -68,7 +79,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.tomato,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: -22,
+    marginTop: -26,
     borderWidth: 4,
     borderColor: colors.surface,
     ...shadow.floating,

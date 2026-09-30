@@ -22,6 +22,12 @@ interface AppState {
   favorites: string[];
   /** Messages non lus (toutes conversations) : pastille de l'onglet Messages. Non persisté. */
   unread: number;
+  /** Langue de l'interface (français par défaut, Charte de la langue française). Conservée à la déconnexion. */
+  lang: 'fr' | 'en';
+  /** Dernier courriel utilisé pour se connecter : pré-rempli à la prochaine connexion. Conservé à la déconnexion. */
+  lastEmail: string;
+  setLang: (lang: 'fr' | 'en') => void;
+  setLastEmail: (email: string) => void;
   setUnread: (n: number) => void;
   setUser: (u: SessionUser | null) => void;
   setOnboarded: (v: boolean) => void;
@@ -47,6 +53,10 @@ export const useApp = create<AppState>()(
       hasRealLocation: false,
       favorites: [],
       unread: 0,
+      lang: 'fr',
+      lastEmail: '',
+      setLang: (lang) => set({ lang }),
+      setLastEmail: (lastEmail) => set({ lastEmail }),
       setUnread: (unread) => set({ unread }),
       setUser: (user) => set({ user }),
       setOnboarded: (onboarded) => set({ onboarded }),
@@ -61,7 +71,7 @@ export const useApp = create<AppState>()(
       name: 'homemade-app',
       storage: createJSONStorage(() => AsyncStorage),
       // La session Supabase est gérée par supabase-js ; on ne persiste ici que les préférences locales.
-      partialize: (s) => ({ onboarded: s.onboarded, health: s.health, filters: s.filters, user: s.user, favorites: s.favorites }),
+      partialize: (s) => ({ onboarded: s.onboarded, health: s.health, filters: s.filters, user: s.user, favorites: s.favorites, lang: s.lang, lastEmail: s.lastEmail }),
     },
   ),
 );

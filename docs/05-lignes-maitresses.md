@@ -25,6 +25,7 @@ Le document à relire avant chaque décision produit ou technique. Si une demand
 | Commission plateforme (Cooker) | 12 % du sous-total | `PLATFORM_FEE_RATE` |
 | Frais de service (Eater) | 5 % du sous-total | `SERVICE_FEE_RATE` |
 | Prix par portion | 2 $ – 50 $ CA | contrainte `meals.price_cents` |
+| Prix suggéré au Cooker | 5 $ / portion (choix rapides 4, 5, 6, 8 $) | `SUGGESTED_PRICE`, `QUICK_PRICES` (publish.tsx) |
 | Portions par annonce | 1 – 20 | contrainte `meals.portions_total` |
 | Fenêtre de disponibilité | 2 – 72 h | `publish_meal`, contrainte `meals_window_valid` |
 | Rayon de recherche | 1 – 25 km (défaut 5) | filtres, `feed_meals` (max 50 km serveur) |
@@ -38,9 +39,11 @@ Le document à relire avant chaque décision produit ou technique. Si une demand
 | Modèle IA local (développement, gratuit) | `qwen3-vl:2b-instruct` via Ollama (≈ 12 s, RTX 3050) ; `4b-instruct` plus précis (≈ 75 s) | `EXPO_PUBLIC_AI_PROVIDER=local`, `EXPO_PUBLIC_LOCAL_AI_MODEL` |
 | Photo envoyée à l'IA | 1280 px, JPEG 70 % (plat) · 1600 px, JPEG 80 % (étiquette/recette) | `preparePhoto()`, `prepareTextPhoto()` |
 | Inscription | Sur code d'invitation pendant la bêta (défaut : exigé) | `app_config.invite_required` |
+| Confirmation du courriel | Code à 6 chiffres par courriel si un Gmail d'envoi est configuré (sinon inscription immédiate) | secrets `GMAIL_ADDRESS`, `GMAIL_APP_PASSWORD` → `supabase-deploy.mjs auth` |
+| Langues | Français (défaut) · anglais, au choix de l'utilisateur | `src/i18n` (clé = texte français), `npm run test:i18n` |
 | Code de lancement bêta | `VOISINS2026`, 100 inscriptions | `beta_invites` (migration bêta) |
 | Invitations par membre | 5 | `my_invite_code` |
-| Carte | Leaflet 1.9.4 + OpenStreetMap (CARTO), sans clé | `src/lib/mapHtml.ts` |
+| Carte | Leaflet 1.9.4 embarqué dans l'app + fond CARTO (repli : tuiles OpenStreetMap), sans clé | `src/lib/mapHtml.ts`, `src/lib/leafletInline.ts` |
 | Objectif rappel allergènes IA | ≥ 98 % | jeu d'évaluation (docs/03) |
 | Objectif latence analyse | p95 < 8 s | idem |
 
@@ -65,7 +68,7 @@ Toute modification d'un paramètre se fait **à un seul endroit** et se reflète
 - **Contrats typés** : les RPC renvoient exactement les types de `src/types.ts` ; tout changement de schéma met à jour les deux.
 - **Référentiels synchronisés** : `supabase/seed.sql` ⇄ `src/data/allergens.ts` ⇄ `supabase/functions/analyze-meal/prompt.ts`.
 - **Versionner l'IA** : toute modification du prompt ou du schéma incrémente `PROMPT_VERSION` et passe par le jeu d'évaluation.
-- **Avant de livrer** : `npm run typecheck` et `npm run test:db` au vert ; nouvelle règle métier = nouveau cas dans `supabase/tests/db.test.mjs`.
+- **Avant de livrer** : `npm run typecheck`, `npm run test:db` et `npm run test:i18n` au vert ; nouvelle règle métier = nouveau cas dans `supabase/tests/db.test.mjs`.
 - **Migrations additives** : ne jamais modifier une migration déjà appliquée en production ; en créer une nouvelle.
 - **Expo évolue vite** : vérifier la documentation de la version d'Expo installée avant d'utiliser une API (voir `AGENTS.md`).
 

@@ -10,6 +10,7 @@ import { colors, fonts, radius, shadow, spacing, type } from '@/theme';
 import type { Meal } from '@/types';
 import { Avatar, RatingPill } from './ui';
 
+import { t, tr } from '@/i18n';
 export function MealCard({ meal, variant = 'full' }: { meal: Meal; variant?: 'full' | 'compact' }) {
   const cuisine = cuisineById(meal.cuisine);
   const lowStock = meal.portionsLeft <= 1;
@@ -43,13 +44,13 @@ export function MealCard({ meal, variant = 'full' }: { meal: Meal; variant?: 'fu
         <View style={styles.topRow}>
           <View style={styles.glass}>
             <Text style={styles.glassText}>
-              {cuisine.emoji} {cuisine.fr}
+              {cuisine.emoji} {tr(cuisine)}
             </Text>
           </View>
           {meal.mode !== 'sale' && (
             <View style={[styles.glass, { backgroundColor: 'rgba(31,58,46,0.85)' }]}>
               <Ionicons name="swap-horizontal" size={12} color={colors.onDark} />
-              <Text style={styles.glassText}>{meal.mode === 'swap' ? 'Échange' : 'Achat ou échange'}</Text>
+              <Text style={styles.glassText}>{meal.mode === 'swap' ? t('Échange') : t('Achat ou échange')}</Text>
             </View>
           )}
         </View>
@@ -78,7 +79,7 @@ export function MealCard({ meal, variant = 'full' }: { meal: Meal; variant?: 'fu
           <Text style={type.caption}>{formatDistance(meal.distanceKm)}</Text>
         </View>
         {lowStock && (
-          <Text style={[type.caption, { color: colors.tomato, fontFamily: fonts.semibold }]}>Plus que {meal.portionsLeft} portion — faites vite !</Text>
+          <Text style={[type.caption, { color: colors.tomato, fontFamily: fonts.semibold }]}>{t('Plus que')}{' '}{meal.portionsLeft}{' '}{t('portion — faites vite !')}</Text>
         )}
       </View>
     </Pressable>

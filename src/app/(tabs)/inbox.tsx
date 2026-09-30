@@ -9,6 +9,7 @@ import { fetchConversations } from '@/services/chat';
 import { colors, fonts, radius, spacing, type } from '@/theme';
 import type { Conversation } from '@/types';
 
+import { t } from '@/i18n';
 export default function Inbox() {
   const insets = useSafeAreaInsets();
   const [items, setItems] = useState<Conversation[]>([]);
@@ -27,12 +28,12 @@ export default function Inbox() {
       keyExtractor={(c) => c.id}
       ListHeaderComponent={
         <View style={{ marginBottom: spacing.xl, gap: spacing.xs }}>
-          <Text style={type.h1}>Messages</Text>
-          <Text style={type.body}>Coordonnez vos cueillettes et vos échanges.</Text>
+          <Text style={type.h1}>{t('Messages')}</Text>
+          <Text style={type.body}>{t('Coordonnez vos cueillettes et vos échanges.')}</Text>
         </View>
       }
       ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
-      ListEmptyComponent={<EmptyState icon="chatbubbles-outline" title="Aucune conversation" body="Vos échanges avec les Cookers et les Eaters apparaîtront ici." />}
+      ListEmptyComponent={<EmptyState icon="chatbubbles-outline" title={t('Aucune conversation')} body={t('Vos échanges avec les Cookers et les Eaters apparaîtront ici.')} />}
       renderItem={({ item }) => (
         <Pressable onPress={() => router.push({ pathname: '/chat/[id]', params: { id: item.id } })} style={({ pressed }) => [styles.row, pressed && { opacity: 0.85 }]}>
           <View>

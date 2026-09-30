@@ -9,6 +9,7 @@ import { saveHealthProfile } from '@/services/profile';
 import { useApp } from '@/store/app';
 import { colors, spacing, type } from '@/theme';
 
+import { t } from '@/i18n';
 export default function HealthModal() {
   const insets = useSafeAreaInsets();
   const { health, setHealth } = useApp();
@@ -22,7 +23,7 @@ export default function HealthModal() {
       setHealth(draft);
       router.back();
     } catch (e) {
-      Alert.alert('Profil santé non enregistré', friendlyError(e));
+      Alert.alert(t('Préférences non enregistrées'), friendlyError(e));
     } finally {
       setSaving(false);
     }
@@ -31,14 +32,14 @@ export default function HealthModal() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.xl, paddingTop: insets.top + spacing.md }}>
-        <Text style={type.h2}>Profil santé</Text>
-        <IconButton icon="close" onPress={() => router.back()} accessibilityLabel="Fermer" />
+        <Text style={type.h2}>{t('Préférences alimentaires')}</Text>
+        <IconButton icon="close" onPress={() => router.back()} accessibilityLabel={t('Fermer')} />
       </View>
       <ScrollView contentContainerStyle={{ paddingHorizontal: spacing.xl, paddingBottom: 140 }}>
         <HealthEditor value={draft} onChange={setDraft} />
       </ScrollView>
       <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: spacing.xl, paddingBottom: insets.bottom + spacing.lg, backgroundColor: colors.bg }}>
-        <Button title="Enregistrer" onPress={save} loading={saving} />
+        <Button title={t('Enregistrer')} onPress={save} loading={saving} />
       </View>
     </View>
   );

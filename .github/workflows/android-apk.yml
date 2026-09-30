@@ -20,7 +20,11 @@ on:
       - '!scripts/test-*.mjs'
       - '!scripts/bench-local-ai.mjs'
       - '!scripts/fixtures/**'
+      - '!scripts/android-e2e.mjs'
+      - '!scripts/check-i18n.mjs'
+      - '!scripts/vendor-leaflet.mjs'
       - '!.github/workflows/supabase-deploy.yml'
+      - '!.github/workflows/android-e2e.yml'
 
 permissions:
   contents: write # nécessaire pour créer la Release qui héberge l'APK
@@ -117,6 +121,7 @@ jobs:
           4. Ouvre l'app → **Créer un compte** → entre le **code d'invitation** reçu.
 
           Mise à jour : installe simplement la nouvelle version par-dessus, ton compte est conservé.
+          Langue : touche **FR / EN** en haut de l'accueil (ou Profil → Paramètres). _English available: tap FR / EN._
 
           _Version de test n°${GITHUB_RUN_NUMBER} · ${GITHUB_SHA::7}_
           NOTES

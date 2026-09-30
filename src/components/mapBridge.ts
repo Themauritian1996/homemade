@@ -1,5 +1,5 @@
 /** Logique commune aux deux rendus de la carte (WebView native, iframe web). */
-import { useEffect, useImperativeHandle, useMemo, useRef } from 'react';
+import { useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import type { StyleProp, ViewStyle } from 'react-native';
 import { buildMapHtml, MapCommand, MapEvent, MapMarker, MapState } from '@/lib/mapHtml';
 import type { GeoPoint } from '@/types';
@@ -26,8 +26,12 @@ export interface LeafletMapProps {
   style?: StyleProp<ViewStyle>;
 }
 
+/** Au-delà, la carte est considérée comme bloquée (WebView lente, réseau coupé) : l'écran propose la liste. */
+const READY_TIMEOUT_MS = 15_000;
+
 export function useMapBridge(props: LeafletMapProps, ref: React.Ref<LeafletMapHandle>, send: (c: MapCommand) => void) {
   const ready = useRef(false);
+  const [loading, setLoading] = useState(true);
   // Déplacement demandé avant le chargement de la carte : rejoué dès qu'elle est prête.
   const pending = useRef<MapCommand | null>(null);
   const move = (c: MapCommand) => {
@@ -36,6 +40,13 @@ export function useMapBridge(props: LeafletMapProps, ref: React.Ref<LeafletMapHa
   };
   const latest = useRef(props);
   latest.current = props;
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!ready.current) latest.current.onError?.('timeout');
+    }, READY_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, []);
 
   // HTML construit une seule fois : les changements passent ensuite par des messages (pas de rechargement).
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -68,6 +79,7 @@ export function useMapBridge(props: LeafletMapProps, ref: React.Ref<LeafletMapHa
     const p = latest.current;
     if (e.type === 'ready') {
       ready.current = true;
+      setLoading(false);
       send({ cmd: 'update', state: JSON.parse(stateKey) as MapState });
       if (pending.current) send(pending.current);
       pending.current = null;
@@ -76,5 +88,5 @@ export function useMapBridge(props: LeafletMapProps, ref: React.Ref<LeafletMapHa
     else if (e.type === 'error') p.onError?.(e.reason);
   };
 
-  return { html, onEvent, resetReady: () => (ready.current = false) };
+  return { html, onEvent, loading, resetReady: () => (ready.current = false) };
 }

@@ -11,6 +11,7 @@ import type { GeoPoint } from '@/types';
 import { LeafletMap, LeafletMapHandle } from './LeafletMap';
 import { Button, TextField } from './ui';
 
+import { t } from '@/i18n';
 /** Quartier lisible à partir de coordonnées (jamais la rue : on ne publie qu'une zone approximative). */
 async function neighborhoodOf(p: GeoPoint): Promise<string | null> {
   try {
@@ -94,11 +95,11 @@ export function PickupPicker({
       <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'center' }}>
         <Ionicons name="hand-left-outline" size={16} color={colors.muted} />
         <Text style={[type.caption, { flex: 1 }]}>
-          {mapFailed ? 'Carte indisponible : utilisez votre position actuelle.' : 'Touchez la carte ou glissez l’épingle sur votre lieu de cueillette.'}
+          {mapFailed ? t('Carte indisponible : utilisez votre position actuelle.') : t('Touchez la carte ou glissez l’épingle sur votre lieu de cueillette.')}
         </Text>
       </View>
       <Button
-        title="Utiliser ma position actuelle"
+        title={t('Utiliser ma position actuelle')}
         variant="secondary"
         size="md"
         icon="navigate-outline"
@@ -106,16 +107,14 @@ export function PickupPicker({
         onPress={() => useMyPosition(true)}
       />
       <TextField
-        label="Zone affichée aux voisins"
+        label={t('Zone affichée aux voisins')}
         value={area}
         onChangeText={onAreaChange}
-        placeholder="Ex. Plateau — près du parc Laurier"
+        placeholder={t('Ex. Plateau — près du parc Laurier')}
         icon="location-outline"
         maxLength={120}
       />
-      <Text style={type.caption}>
-        Votre adresse exacte n'est partagée qu'après acceptation d'une commande. Sur la carte publique, le point est décalé de 100 à 300 m.
-      </Text>
+      <Text style={type.caption}>{t('Votre adresse exacte n\'est partagée qu\'après acceptation d\'une commande. Sur la carte publique, le point est décalé de 100 à 300 m.')}</Text>
     </View>
   );
 }

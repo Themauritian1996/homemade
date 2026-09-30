@@ -1,0 +1,83 @@
+# Test de la VRAIE APK sur un émulateur Android, après chaque nouvelle version publiée (ou à la main :
+# onglet Actions → « Test Android (émulateur) » → Run workflow).
+# Un compte robot temporaire est créé sur le serveur puis supprimé. Les captures d'écran sont publiées dans la
+# branche « e2e-captures » et jointes au résultat du test (Artifacts).
+name: Test Android (émulateur)
+
+on:
+  workflow_run:
+    workflows: ['APK Android']
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-e2e
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF || 'lcpoxseqtabauemymlss' }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Dernière APK publiée
+        run: |
+          gh release download --repo "${{ github.repository }}" --pattern Homemade.apk --clobber
+          gh release view --repo "${{ github.repository }}" --json tagName,name --jq '"Version testée : " + .name + " (" + .tagName + ")"'
+          ls -lh Homemade.apk
+
+      - name: Compte robot temporaire
+        run: node scripts/supabase-deploy.mjs robot-create
+
+      - name: Accélération matérielle (KVM)
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Parcours de l'app sur Android
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
+          script: node scripts/android-e2e.mjs Homemade.apk e2e-captures
+
+      - name: Suppression du compte robot
+        if: always()
+        run: node scripts/supabase-deploy.mjs robot-delete
+
+      - name: Captures (Artifacts)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: captures-android
+          path: e2e-captures
+          if-no-files-found: ignore
+
+      - name: Captures (branche e2e-captures)
+        if: always()
+        run: |
+          [ -d e2e-captures ] || exit 0
+          cd e2e-captures
+          git init -q
+          git checkout -q -b e2e-captures
+          git add .
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -qm "Captures du test Android (${{ github.run_id }})"
+          git push -qf "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" e2e-captures

@@ -105,6 +105,8 @@ export interface AiTextScan {
   text: string;
   title: string;
   ingredients: { name: string; allergens: AllergenCode[] }[];
+  /** Ingrédients statistiquement présents dans ce plat mais absents du texte : proposés (cochés par défaut), le Cooker retire ce qui ne s'applique pas. */
+  likelyIngredients?: { name: string; allergens: AllergenCode[]; confidence: number }[];
   /** Allergènes présents (mentions « Contient » + ingrédients), implications incluses. */
   contains: AllergenCode[];
   /** Mentions de précaution (« Peut contenir »). */

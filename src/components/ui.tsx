@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, fonts, radius, spacing, type } from '@/theme';
 import { formatRating } from '@/lib/format';
 
+import { t } from '@/i18n';
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
 // ───────────────────────────── Button
@@ -227,6 +228,22 @@ export function Divider({ style }: { style?: StyleProp<ViewStyle> }) {
   return <View style={[{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border }, style]} />;
 }
 
+// ───────────────────────────── Marque
+const LOGO_MARK = require('../../assets/brand/logo-mark.png');
+
+/** Logo Homemade : la marque (toit + bol fumant, comme l'icône de l'app) suivie du mot « homemade. ». */
+export function Logo({ size = 32, light, markOnly }: { size?: number; light?: boolean; markOnly?: boolean }) {
+  return (
+    <View style={styles.logo} accessibilityRole="image" accessibilityLabel={t('Homemade')}>
+      <Image source={LOGO_MARK} style={{ width: size, height: size, borderRadius: size * 0.26 }} contentFit="contain" />
+      {!markOnly && (
+        <Text style={[styles.logoText, { fontSize: size * 0.78, color: light ? colors.onDark : colors.forest }]}>{t('homemade')}<Text style={{ color: colors.tomato }}>.</Text>
+        </Text>
+      )}
+    </View>
+  );
+}
+
 // ───────────────────────────── Écrans secondaires
 const goBack = () => (router.canGoBack() ? router.back() : router.replace('/'));
 
@@ -235,7 +252,7 @@ export function ScreenHeader({ title, subtitle, modal, right }: { title: string;
   const insets = useSafeAreaInsets();
   return (
     <View style={[styles.screenHeader, { paddingTop: insets.top + spacing.sm }]}>
-      {!modal && <IconButton icon="chevron-back" onPress={goBack} accessibilityLabel="Retour" />}
+      {!modal && <IconButton icon="chevron-back" onPress={goBack} accessibilityLabel={t('Retour')} />}
       <View style={{ flex: 1 }}>
         <Text style={type.h2} numberOfLines={1}>
           {title}
@@ -243,7 +260,7 @@ export function ScreenHeader({ title, subtitle, modal, right }: { title: string;
         {subtitle && <Text style={type.caption}>{subtitle}</Text>}
       </View>
       {right}
-      {modal && <IconButton icon="close" onPress={goBack} accessibilityLabel="Fermer" />}
+      {modal && <IconButton icon="close" onPress={goBack} accessibilityLabel={t('Fermer')} />}
     </View>
   );
 }
@@ -293,6 +310,8 @@ export function ListRow({
 }
 
 const styles = StyleSheet.create({
+  logo: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  logoText: { fontFamily: fonts.display, letterSpacing: -0.5 },
   screenHeader: {
     flexDirection: 'row',
     alignItems: 'center',

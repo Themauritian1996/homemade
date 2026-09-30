@@ -52,7 +52,8 @@
     "lint": "expo lint",
     "test:db": "node supabase/tests/db.test.mjs",
     "test:ai": "node scripts/test-local-ai.mjs",
-    "test:ai-providers": "node --experimental-strip-types --no-warnings scripts/test-ai-providers.mjs"
+    "test:ai-providers": "node --experimental-strip-types --no-warnings scripts/test-ai-providers.mjs",
+    "test:i18n": "node scripts/check-i18n.mjs"
   },
   "private": true
 }

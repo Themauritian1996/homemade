@@ -14,13 +14,14 @@ import { activeFilterCount, useApp } from '@/store/app';
 import { colors, fonts, radius, shadow, spacing, type } from '@/theme';
 import type { Meal } from '@/types';
 
+import { t } from '@/i18n';
 export default function MapScreen() {
   const [view, setView] = useState<'map' | 'list'>('map');
   const [mapError, setMapError] = useState(false);
   if (view === 'list' || mapError) {
     return (
       <NearbyList
-        notice={mapError ? 'La carte n’a pas pu se charger (connexion ?). Voici les plats triés par distance.' : undefined}
+        notice={mapError ? t('La carte n’a pas pu se charger (connexion ?). Voici les plats triés par distance.') : undefined}
         onShowMap={() => {
           setMapError(false);
           setView('map');
@@ -52,10 +53,16 @@ function InteractiveMap({ onShowList, onError }: { onShowList: () => void; onErr
     if (loading || !meals.length) return;
     const points = [...meals.map((m) => m.pickupLocation), ...(hasRealLocation ? [location] : [])];
     // Petit délai : la carte doit avoir reçu ses marqueurs.
-    const t = setTimeout(() => mapRef.current?.fit(points, { top: insets.top + 130, bottom: 190 }), 300);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => mapRef.current?.fit(points, { top: insets.top + 130, bottom: 190 }), 300);
+    return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resultKey, loading]);
+
+  // Position connue après l'ouverture de la carte (GPS lent) : on s'y rend s'il n'y a pas de plats à cadrer.
+  useEffect(() => {
+    if (hasRealLocation && !meals.length) mapRef.current?.flyTo(location, 14);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasRealLocation, location.latitude, location.longitude]);
 
   const markers = useMemo(
     () =>
@@ -80,7 +87,7 @@ function InteractiveMap({ onShowList, onError }: { onShowList: () => void; onErr
   const recenter = async () => {
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Position désactivée', 'Autorisez la localisation dans les réglages du téléphone pour voir les plats autour de vous.');
+      Alert.alert(t('Position désactivée'), t('Autorisez la localisation dans les réglages du téléphone pour voir les plats autour de vous.'));
       return;
     }
     try {
@@ -89,7 +96,7 @@ function InteractiveMap({ onShowList, onError }: { onShowList: () => void; onErr
       setLocation(p, true);
       mapRef.current?.flyTo(p, 14);
     } catch {
-      Alert.alert('Position introuvable', 'Activez la localisation du téléphone, puis réessayez.');
+      Alert.alert(t('Position introuvable'), t('Activez la localisation du téléphone, puis réessayez.'));
     }
   };
 
@@ -113,13 +120,13 @@ function InteractiveMap({ onShowList, onError }: { onShowList: () => void; onErr
           <View style={styles.searchPill}>
             <Ionicons name="location" size={16} color={colors.tomato} />
             <Text style={styles.searchText} numberOfLines={1}>
-              {loading ? 'Recherche…' : `${meals.length} repas dans un rayon de ${filters.radiusKm} km`}
+              {loading ? t('Recherche…') : t('{0} repas dans un rayon de {1} km', { 0: meals.length, 1: filters.radiusKm })}
             </Text>
           </View>
-          <Pressable style={styles.roundBtn} onPress={onShowList} accessibilityRole="button" accessibilityLabel="Afficher la liste">
+          <Pressable style={styles.roundBtn} onPress={onShowList} accessibilityRole="button" accessibilityLabel={t('Afficher la liste')}>
             <Ionicons name="list-outline" size={20} color={colors.ink} />
           </Pressable>
-          <Pressable style={styles.roundBtn} onPress={() => setSheet(true)} accessibilityRole="button" accessibilityLabel="Filtres">
+          <Pressable style={styles.roundBtn} onPress={() => setSheet(true)} accessibilityRole="button" accessibilityLabel={t('Filtres')}>
             <Ionicons name="options-outline" size={20} color={colors.ink} />
             {activeFilterCount(filters) > 0 && <View style={styles.dot} />}
           </Pressable>
@@ -132,7 +139,7 @@ function InteractiveMap({ onShowList, onError }: { onShowList: () => void; onErr
               ['swap', 'Échange'],
             ] as const
           ).map(([id, label]) => (
-            <Chip key={id} label={label} selected={filters.mode === id} onPress={() => setFilters({ mode: id })} />
+            <Chip key={id} label={t(label)} selected={filters.mode === id} onPress={() => setFilters({ mode: id })} />
           ))}
         </View>
       </View>
@@ -141,28 +148,28 @@ function InteractiveMap({ onShowList, onError }: { onShowList: () => void; onErr
         style={[styles.roundBtn, styles.locate, { bottom: meals.length ? 150 : spacing.xl }]}
         onPress={recenter}
         accessibilityRole="button"
-        accessibilityLabel="Me localiser"
+        accessibilityLabel={t('Me localiser')}
       >
         <Ionicons name={hasRealLocation ? 'navigate' : 'navigate-outline'} size={20} color={colors.forest} />
       </Pressable>
 
       {!loading && meals.length === 0 && (
         <View style={styles.emptyCard}>
-          <Text style={type.bodyStrong}>Aucun plat dans ce rayon</Text>
+          <Text style={type.bodyStrong}>{t('Aucun plat dans ce rayon')}</Text>
           <Text style={type.caption}>
             {hasRealLocation
-              ? 'Élargissez la zone ou revenez plus tard : les voisins publient surtout en fin de journée.'
-              : 'Activez votre position pour voir les plats autour de vous.'}
+              ? t('Élargissez la zone ou revenez plus tard : les voisins publient surtout en fin de journée.')
+              : t('Activez votre position pour voir les plats autour de vous.')}
           </Text>
           <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm }}>
             {filters.radiusKm < 25 && (
               <Button
-                title={`Élargir à ${Math.min(25, filters.radiusKm * 2)} km`}
+                title={t('Élargir à {0} km', { 0: Math.min(25, filters.radiusKm * 2) })}
                 size="md"
                 onPress={() => setFilters({ radiusKm: Math.min(25, filters.radiusKm * 2) })}
               />
             )}
-            {!hasRealLocation && <Button title="Ma position" size="md" variant="secondary" icon="navigate-outline" onPress={recenter} />}
+            {!hasRealLocation && <Button title={t('Ma position')} size="md" variant="secondary" icon="navigate-outline" onPress={recenter} />}
           </View>
         </View>
       )}

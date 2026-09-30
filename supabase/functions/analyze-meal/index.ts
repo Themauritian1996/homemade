@@ -1,4 +1,4 @@
-// POST /functions/v1/analyze-meal  { photo_path, task?: 'meal' | 'ocr' }  ·  { ping: true }
+// POST /functions/v1/analyze-meal  { photo_path, task?: 'meal' | 'ocr', lang?: 'fr' | 'en' }  ·  { ping: true }
 // Photo (Storage) → IA vision (sortie JSON contrainte par schéma) → nettoyage fail-closed → journal ai_analyses.
 //   task = meal : reconnaissance du plat (titre, ingrédients, allergènes)
 //   task = ocr  : lecture d'une étiquette ou d'une recette (texte, ingrédients, « Contient », « Peut contenir »)
@@ -9,6 +9,7 @@
 // Les clés ne quittent jamais le serveur (secrets Supabase).
 import { adminClient, env, handler, HttpError, json, requireUser } from '../_shared/http.ts';
 import {
+  languageInstruction,
   OCR_OUTPUT_SCHEMA,
   OCR_SYSTEM_PROMPT,
   OUTPUT_SCHEMA,
@@ -88,7 +89,7 @@ async function runVision(req: VisionRequest): Promise<VisionResult> {
 Deno.serve(
   handler(async (req) => {
     const { user } = await requireUser(req);
-    const body = (await req.json()) as { photo_path?: string; task?: string; ping?: boolean };
+    const body = (await req.json()) as { photo_path?: string; task?: string; lang?: string; ping?: boolean };
     const available = FREE_PROVIDERS.length > 0 || Boolean(ANTHROPIC_KEY);
     if (body.ping) {
       return json({ ok: available, providers: [...FREE_PROVIDERS.map((p) => p.name), ...(ANTHROPIC_KEY ? ['anthropic'] : [])], prompt_version: PROMPT_VERSION });
@@ -96,6 +97,7 @@ Deno.serve(
     if (!available) throw new HttpError(503, 'AI_NOT_CONFIGURED', 'Analyse indisponible, saisie manuelle possible.');
     const { photo_path } = body;
     const task = body.task === 'ocr' ? 'ocr' : 'meal';
+    const lang = body.lang === 'en' ? 'en' : 'fr';
     if (!photo_path || !photo_path.startsWith(`${user.id}/`)) throw new HttpError(400, 'INVALID_PHOTO_PATH');
 
     const admin = adminClient();
@@ -117,7 +119,7 @@ Deno.serve(
     const started = Date.now();
     let result: VisionResult;
     try {
-      result = await runVision({ ...TASKS[task], imageBase64: toBase64(bytes), mediaType });
+      result = await runVision({ ...TASKS[task], system: TASKS[task].system + languageInstruction(lang), imageBase64: toBase64(bytes), mediaType });
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       console.error('[analyze-meal]', message);

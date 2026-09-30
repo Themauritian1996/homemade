@@ -11,6 +11,7 @@ import { friendlyError } from '@/lib/errors';
 import { submitReview } from '@/services/orders';
 import { colors, fonts, radius, spacing, type } from '@/theme';
 
+import { t } from '@/i18n';
 // Rôle affiché : ici l'Eater note le Cooker. L'écran symétrique (Cooker → Eater) utilise EATER_CRITERIA.
 const COOKER_CRITERIA = [
   { id: 'taste', label: 'Goût' },
@@ -30,14 +31,14 @@ export default function ReviewModal() {
   const [loading, setLoading] = useState(false);
 
   const submit = async () => {
-    if (rating === 0) return Alert.alert('Note requise', 'Choisissez une note globale.');
+    if (rating === 0) return Alert.alert(t('Note requise'), t('Choisissez une note globale.'));
     setLoading(true);
     try {
       await submitReview({ orderId, rating, comment, tags, subScores: sub });
-      Alert.alert('Merci !', 'Votre avis sera publié dès que les deux parties auront noté l’échange.');
+      Alert.alert(t('Merci !'), t('Votre avis sera publié dès que les deux parties auront noté l’échange.'));
       router.back();
     } catch (e) {
-      Alert.alert('Avis non enregistré', friendlyError(e));
+      Alert.alert(t('Avis non enregistré'), friendlyError(e));
     } finally {
       setLoading(false);
     }
@@ -46,40 +47,40 @@ export default function ReviewModal() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.xl, paddingTop: insets.top + spacing.md }}>
-        <Text style={type.h2}>Comment c'était ?</Text>
-        <IconButton icon="close" onPress={() => router.back()} accessibilityLabel="Fermer" />
+        <Text style={type.h2}>{t('Comment c\'était ?')}</Text>
+        <IconButton icon="close" onPress={() => router.back()} accessibilityLabel={t('Fermer')} />
       </View>
       <ScrollView contentContainerStyle={{ padding: spacing.xl, gap: spacing.xxl, paddingBottom: 140 }}>
         <View style={{ alignItems: 'center', gap: spacing.md }}>
-          <Text style={type.body}>Votre note globale</Text>
+          <Text style={type.body}>{t('Votre note globale')}</Text>
           <Stars value={rating} size={40} onChange={setRating} />
         </View>
         <View style={{ gap: spacing.lg }}>
           {COOKER_CRITERIA.map((c) => (
             <View key={c.id} style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Text style={[type.bodyStrong, { flex: 1 }]}>{c.label}</Text>
+              <Text style={[type.bodyStrong, { flex: 1 }]}>{t(c.label)}</Text>
               <Stars value={sub[c.id] ?? 0} size={22} onChange={(v) => setSub({ ...sub, [c.id]: v })} />
             </View>
           ))}
         </View>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
-          {TAGS.map((t) => (
-            <Chip key={t} label={t} selected={tags.includes(t)} onPress={() => setTags(tags.includes(t) ? tags.filter((x) => x !== t) : [...tags, t])} />
+          {TAGS.map((tag) => (
+            <Chip key={tag} label={t(tag)} selected={tags.includes(tag)} onPress={() => setTags(tags.includes(tag) ? tags.filter((x) => x !== tag) : [...tags, tag])} />
           ))}
         </View>
         <TextInput
           value={comment}
           onChangeText={setComment}
-          placeholder="Racontez votre expérience (optionnel)"
+          placeholder={t('Racontez votre expérience (optionnel)')}
           placeholderTextColor={colors.muted}
           multiline
           maxLength={600}
           style={{ minHeight: 110, backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, fontFamily: fonts.regular, fontSize: 15, color: colors.ink, borderWidth: 1, borderColor: colors.border, textAlignVertical: 'top' }}
         />
-        <Text style={type.caption}>Un problème d'hygiène ou d'allergène ? Signalez-le depuis l'aide : notre équipe le traite en priorité.</Text>
+        <Text style={type.caption}>{t('Un problème d\'hygiène ou d\'allergène ? Signalez-le depuis l\'aide : notre équipe le traite en priorité.')}</Text>
       </ScrollView>
       <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: spacing.xl, paddingBottom: insets.bottom + spacing.md, backgroundColor: colors.bg }}>
-        <Button title="Publier mon avis" onPress={submit} loading={loading} />
+        <Button title={t('Publier mon avis')} onPress={submit} loading={loading} />
       </View>
     </View>
   );

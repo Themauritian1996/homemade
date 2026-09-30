@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScreenHeader } from '@/components/ui';
 import { colors, spacing, type } from '@/theme';
 
+import { t } from '@/i18n';
 const UPDATED = '29 septembre 2026';
 
 const DOCS: Record<string, { title: string; sections: [string, string][] }> = {
@@ -91,12 +92,12 @@ export default function LegalDoc() {
   const d = DOCS[doc] ?? DOCS.terms;
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <ScreenHeader title={d.title} subtitle={`Version bêta · ${UPDATED}`} />
+      <ScreenHeader title={t(d.title)} subtitle={t('Version bêta · {0}', { 0: UPDATED })} />
       <ScrollView contentContainerStyle={{ padding: spacing.xl, paddingTop: spacing.sm, gap: spacing.lg, paddingBottom: insets.bottom + spacing.huge }}>
         {d.sections.map(([title, body]) => (
           <View key={title} style={{ gap: spacing.xs }}>
-            <Text style={type.h3}>{title}</Text>
-            <Text style={type.body}>{body}</Text>
+            <Text style={type.h3}>{t(title)}</Text>
+            <Text style={type.body}>{t(body)}</Text>
           </View>
         ))}
       </ScrollView>

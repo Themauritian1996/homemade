@@ -11,7 +11,8 @@ import { friendlyError } from '@/lib/errors';
 import { useApp } from '@/store/app';
 import { colors, fonts, radius, spacing, type } from '@/theme';
 import type { Conversation, Message } from '@/types';
-
+
+import { t } from '@/i18n';
 const QUICK_REPLIES = ['Je suis en route 🚶', 'Je suis arrivé·e !', 'Merci, c’était délicieux 🙏'];
 
 export default function Chat() {
@@ -46,7 +47,7 @@ export default function Chat() {
       m = await sendMessage(id, me, text);
     } catch (e) {
       setDraft(text);
-      Alert.alert('Message non envoyé', friendlyError(e));
+      Alert.alert(t('Message non envoyé'), friendlyError(e));
       return;
     }
     setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]));
@@ -56,10 +57,10 @@ export default function Chat() {
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
-        <IconButton icon="chevron-back" onPress={() => router.back()} accessibilityLabel="Retour" />
+        <IconButton icon="chevron-back" onPress={() => router.back()} accessibilityLabel={t('Retour')} />
         {conv && <Avatar uri={conv.other.avatarUrl} name={conv.other.displayName} size={40} verified={conv.other.isVerified} />}
         <View style={{ flex: 1 }}>
-          <Text style={type.bodyStrong}>{conv?.other.displayName ?? 'Conversation'}</Text>
+          <Text style={type.bodyStrong}>{conv?.other.displayName ?? t('Conversation')}</Text>
           <Text style={type.caption} numberOfLines={1}>
             {conv?.mealTitle}
           </Text>
@@ -96,14 +97,14 @@ export default function Chat() {
 
       <View style={{ flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg, paddingBottom: spacing.sm, flexWrap: 'wrap' }}>
         {QUICK_REPLIES.map((q) => (
-          <Pressable key={q} style={styles.quick} onPress={() => send(q)}>
-            <Text style={{ fontFamily: fonts.medium, fontSize: 13, color: colors.forest }}>{q}</Text>
+          <Pressable key={q} style={styles.quick} onPress={() => send(t(q))}>
+            <Text style={{ fontFamily: fonts.medium, fontSize: 13, color: colors.forest }}>{t(q)}</Text>
           </Pressable>
         ))}
       </View>
       <View style={[styles.composer, { paddingBottom: insets.bottom + spacing.sm }]}>
-        <TextInput value={draft} onChangeText={setDraft} placeholder="Écrire un message…" placeholderTextColor={colors.muted} style={styles.input} multiline maxLength={2000} />
-        <Pressable style={[styles.send, !draft.trim() && { opacity: 0.4 }]} onPress={() => send(draft)} disabled={!draft.trim()} accessibilityLabel="Envoyer">
+        <TextInput value={draft} onChangeText={setDraft} placeholder={t('Écrire un message…')} placeholderTextColor={colors.muted} style={styles.input} multiline maxLength={2000} />
+        <Pressable style={[styles.send, !draft.trim() && { opacity: 0.4 }]} onPress={() => send(draft)} disabled={!draft.trim()} accessibilityLabel={t('Envoyer')}>
           <Ionicons name="arrow-up" size={20} color={colors.onDark} />
         </Pressable>
       </View>

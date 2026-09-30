@@ -14,7 +14,8 @@ import { fetchMyProfile, startPayoutOnboarding } from '@/services/profile';
 import type { PublicProfile } from '@/types';
 import { useApp } from '@/store/app';
 import { colors, fonts, radius, shadow, spacing, type } from '@/theme';
-
+
+import { t, tr } from '@/i18n';
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
 const SALES_ENABLED = Boolean(config.stripePublishableKey);
@@ -31,7 +32,7 @@ export default function Profile() {
   );
   const p: PublicProfile = profile ?? {
     id: user?.id ?? '',
-    displayName: user?.displayName ?? 'Moi',
+    displayName: user?.displayName ?? t('Moi'),
     cookerRating: null,
     cookerRatingCount: 0,
     eaterRating: null,
@@ -42,18 +43,18 @@ export default function Profile() {
   };
 
   const confirmSignOut = () =>
-    Alert.alert('Se déconnecter ?', 'Vous pourrez vous reconnecter avec votre courriel et votre mot de passe.', [
-      { text: 'Annuler', style: 'cancel' },
-      { text: 'Se déconnecter', style: 'destructive', onPress: () => signOut() },
+    Alert.alert(t('Se déconnecter ?'), t('Vous pourrez vous reconnecter avec votre courriel et votre mot de passe.'), [
+      { text: t('Annuler'), style: 'cancel' },
+      { text: t('Se déconnecter'), style: 'destructive', onPress: () => signOut() },
     ]);
 
   const openPayouts = async () => {
     try {
       const url = await startPayoutOnboarding();
       if (url) await Linking.openURL(url);
-      else Alert.alert('Mode démo', 'Configurez Supabase et Stripe pour activer les paiements Cooker.');
+      else Alert.alert(t('Mode démo'), t('Configurez Supabase et Stripe pour activer les paiements Cooker.'));
     } catch (e) {
-      Alert.alert('Paiements indisponibles', friendlyError(e, 'Réessayez plus tard.'));
+      Alert.alert(t('Paiements indisponibles'), friendlyError(e, t('Réessayez plus tard.')));
     }
   };
 
@@ -62,16 +63,16 @@ export default function Profile() {
       style={{ flex: 1, backgroundColor: colors.bg }}
       contentContainerStyle={{ paddingTop: insets.top + spacing.md, padding: spacing.xl, gap: spacing.xl, paddingBottom: spacing.huge }}
     >
-      <Pressable style={styles.header} onPress={() => router.push('/settings')} accessibilityRole="button" accessibilityLabel="Modifier mon profil">
+      <Pressable style={styles.header} onPress={() => router.push('/settings')} accessibilityRole="button" accessibilityLabel={t('Modifier mon profil')}>
         <Avatar name={p.displayName} uri={p.avatarUrl} size={72} verified={p.isVerified} />
         <View style={{ flex: 1, gap: 4 }}>
           <Text style={type.h2}>{p.displayName}</Text>
           <Text style={type.caption}>
-            {p.neighborhood ? `${p.neighborhood} · ` : ''}membre depuis {new Date(p.memberSince).getFullYear()}
+            {p.neighborhood ? `${p.neighborhood} · ` : ''}{t('membre depuis')}{' '}{new Date(p.memberSince).getFullYear()}
           </Text>
           <View style={{ flexDirection: 'row', gap: spacing.xs, flexWrap: 'wrap' }}>
             {p.badges.map((b) => (
-              <Badge key={b} label={b} tone="forest" icon="ribbon-outline" />
+              <Badge key={b} label={t(b)} tone="forest" icon="ribbon-outline" />
             ))}
           </View>
         </View>
@@ -80,40 +81,40 @@ export default function Profile() {
 
       {/* Réputation bidirectionnelle : une note Cooker ET une note Eater */}
       <View style={styles.stats}>
-        <Stat label="Note Cooker" value={formatRating(p.cookerRating)} sub={`${p.cookerRatingCount} avis`} icon="restaurant" />
+        <Stat label={t('Note Cooker')} value={formatRating(p.cookerRating)} sub={t('{n} avis', { n: p.cookerRatingCount })} icon="restaurant" />
         <View style={styles.statDivider} />
-        <Stat label="Note Eater" value={formatRating(p.eaterRating)} sub={`${p.eaterRatingCount} avis`} icon="happy" />
+        <Stat label={t('Note Eater')} value={formatRating(p.eaterRating)} sub={t('{n} avis', { n: p.eaterRatingCount })} icon="happy" />
         <View style={styles.statDivider} />
-        <Stat label="Repas sauvés" value={String(p.mealsShared ?? 0)} sub="portions partagées" icon="leaf" />
+        <Stat label={t('Repas sauvés')} value={String(p.mealsShared ?? 0)} sub={t('portions partagées')} icon="leaf" />
       </View>
 
       <Card>
         <ListRow
           icon="shield-checkmark-outline"
-          title="Profil santé"
-          subtitle={health.allergens.length ? health.allergens.map((a) => allergenById(a.code).fr).join(', ') : 'Aucune allergie déclarée'}
+          title={t('Préférences alimentaires')}
+          subtitle={health.allergens.length ? health.allergens.map((a) => tr(allergenById(a.code))).join(', ') : t('Régimes, allergies : votre fil s’adapte')}
           onPress={() => router.push('/health')}
         />
         <Divider />
         <ListRow
           icon="storefront-outline"
-          title="Mes plats"
-          subtitle="Annonces en ligne, portions restantes, retrait"
+          title={t('Mes plats')}
+          subtitle={t('Annonces en ligne, portions restantes, retrait')}
           onPress={() => router.push('/my-meals')}
         />
         <Divider />
-        <ListRow icon="receipt-outline" title="Mes commandes et échanges" subtitle="Conversations, avis à laisser" onPress={() => router.push('/inbox')} />
+        <ListRow icon="receipt-outline" title={t('Mes commandes et échanges')} subtitle={t('Conversations, avis à laisser')} onPress={() => router.push('/inbox')} />
         <Divider />
         <ListRow
           icon="heart-outline"
-          title="Mes favoris"
-          subtitle={favorites.length ? `${favorites.length} plat(s) mis de côté` : 'Touchez ♡ sur un plat pour le retrouver ici'}
+          title={t('Mes favoris')}
+          subtitle={favorites.length ? t('{0} plat(s) mis de côté', { 0: favorites.length }) : t('Touchez ♡ sur un plat pour le retrouver ici')}
           onPress={() => router.push('/favorites')}
         />
         {SALES_ENABLED && (
           <>
             <Divider />
-            <ListRow icon="card-outline" title="Recevoir des paiements" subtitle="Activer la vente · virements Stripe" onPress={openPayouts} />
+            <ListRow icon="card-outline" title={t('Recevoir des paiements')} subtitle={t('Activer la vente · virements Stripe')} onPress={openPayouts} />
           </>
         )}
       </Card>
@@ -123,8 +124,8 @@ export default function Profile() {
           <Ionicons name="gift-outline" size={22} color={colors.tomato} />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={[type.bodyStrong, { color: colors.onDark }]}>Invitez vos voisins</Text>
-          <Text style={[type.caption, { color: 'rgba(255,255,255,0.8)' }]}>Plus il y a de Cookers autour de vous, plus le fil est appétissant.</Text>
+          <Text style={[type.bodyStrong, { color: colors.onDark }]}>{t('Invitez vos voisins')}</Text>
+          <Text style={[type.caption, { color: 'rgba(255,255,255,0.8)' }]}>{t('Plus il y a de Cookers autour de vous, plus le fil est appétissant.')}</Text>
         </View>
         <Ionicons name="chevron-forward" size={18} color={colors.onDark} />
       </Pressable>
@@ -132,28 +133,27 @@ export default function Profile() {
       <Card>
         <ListRow
           icon="settings-outline"
-          title="Paramètres"
-          subtitle="Profil public, rayon, notifications, données (Loi 25)"
+          title={t('Paramètres')}
+          subtitle={t('Profil public, rayon, notifications, données (Loi 25)')}
           onPress={() => router.push('/settings')}
         />
         <Divider />
-        <ListRow icon="help-buoy-outline" title="Aide et sécurité alimentaire" onPress={() => router.push('/help')} />
+        <ListRow icon="help-buoy-outline" title={t('Aide et sécurité alimentaire')} onPress={() => router.push('/help')} />
         <Divider />
         <ListRow
           icon="chatbox-ellipses-outline"
-          title="Donner mon avis sur la bêta"
-          subtitle="Un bogue, une idée ? On lit tout."
+          title={t('Donner mon avis sur la bêta')}
+          subtitle={t('Un bogue, une idée ? On lit tout.')}
           onPress={() => router.push('/feedback')}
         />
       </Card>
 
       <Pressable onPress={confirmSignOut} style={styles.logout} accessibilityRole="button">
         <Ionicons name="log-out-outline" size={18} color={colors.danger} />
-        <Text style={{ fontFamily: fonts.semibold, color: colors.danger }}>Se déconnecter</Text>
+        <Text style={{ fontFamily: fonts.semibold, color: colors.danger }}>{t('Se déconnecter')}</Text>
       </Pressable>
-      <Text style={[type.caption, { textAlign: 'center' }]}>
-        Homemade bêta · v{appVersion()}
-        {DEMO_MODE ? ' · mode démo' : ''}
+      <Text style={[type.caption, { textAlign: 'center' }]}>{t('Homemade bêta · v')}{appVersion()}
+        {DEMO_MODE ? t(' · mode démo') : ''}
       </Text>
     </ScrollView>
   );
@@ -161,11 +161,11 @@ export default function Profile() {
 
 function Stat({ label, value, sub, icon }: { label: string; value: string; sub: string; icon: IconName }) {
   return (
-    <View style={{ flex: 1, alignItems: 'center', gap: 2 }}>
+    <View style={{ flex: 1, alignItems: 'center', gap: 2, paddingHorizontal: spacing.xs }}>
       <Ionicons name={icon} size={18} color={colors.tomato} />
       <Text style={[type.h2, { fontSize: 22 }]}>{value}</Text>
-      <Text style={[type.caption, { fontFamily: fonts.semibold, color: colors.ink }]}>{label}</Text>
-      <Text style={type.caption}>{sub}</Text>
+      <Text style={[type.caption, { fontFamily: fonts.semibold, color: colors.ink, textAlign: 'center' }]}>{label}</Text>
+      <Text style={[type.caption, { textAlign: 'center' }]}>{sub}</Text>
     </View>
   );
 }

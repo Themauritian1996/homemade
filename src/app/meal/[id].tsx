@@ -14,7 +14,8 @@ import { fetchCookerReviews, fetchMeal } from '@/services/meals';
 import { useApp } from '@/store/app';
 import { colors, radius, shadow, spacing, type } from '@/theme';
 import type { Meal, Review } from '@/types';
-
+
+import { t, tr } from '@/i18n';
 export default function MealDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
@@ -42,9 +43,9 @@ export default function MealDetail() {
   if (missing) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.bg }}>
-        <ScreenHeader title="Plat introuvable" />
-        <EmptyState icon="restaurant-outline" title="Ce plat n'est plus disponible" body="Il a peut-être été retiré par son Cooker ou est arrivé à expiration.">
-          <Button title="Voir les autres plats" onPress={() => router.replace('/')} style={{ marginTop: spacing.md }} />
+        <ScreenHeader title={t('Plat introuvable')} />
+        <EmptyState icon="restaurant-outline" title={t('Ce plat n\'est plus disponible')} body={t('Il a peut-être été retiré par son Cooker ou est arrivé à expiration.')}>
+          <Button title={t('Voir les autres plats')} onPress={() => router.replace('/')} style={{ marginTop: spacing.md }} />
         </EmptyState>
       </View>
     );
@@ -64,7 +65,7 @@ export default function MealDetail() {
   const blocked = verdict.conflicts.length > 0 || verdict.traceConflicts.length > 0;
   const mine = meal.cooker.id === me;
   const share = () =>
-    Share.share({ message: `${meal.title} · ${formatPrice(meal.priceCents)} sur Homemade 🍽️\nOuvrir dans l'app : homemade://meal/${meal.id}` }).catch(() => {});
+    Share.share({ message: t('{title} · {price} sur Homemade 🍽️\nOuvrir dans l’app : {link}', { title: meal.title, price: formatPrice(meal.priceCents), link: `homemade://meal/${meal.id}` }) }).catch(() => {});
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -73,11 +74,11 @@ export default function MealDetail() {
           <Image source={{ uri: meal.photos[0] }} style={styles.hero} contentFit="cover" transition={300} />
           <LinearGradient colors={['rgba(0,0,0,0.45)', 'transparent']} style={[StyleSheet.absoluteFill, { height: 140 }]} />
           <View style={[styles.heroBar, { top: insets.top + spacing.sm }]}>
-            <Pressable style={styles.heroBtn} onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} accessibilityLabel="Retour">
+            <Pressable style={styles.heroBtn} onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} accessibilityLabel={t('Retour')}>
               <Ionicons name="chevron-back" size={20} color={colors.ink} />
             </Pressable>
             <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-              <Pressable style={styles.heroBtn} onPress={share} accessibilityLabel="Partager">
+              <Pressable style={styles.heroBtn} onPress={share} accessibilityLabel={t('Partager')}>
                 <Ionicons name="share-outline" size={19} color={colors.ink} />
               </Pressable>
               {!mine && (
@@ -85,7 +86,7 @@ export default function MealDetail() {
                   style={styles.heroBtn}
                   onPress={() => toggleFavorite(meal.id)}
                   accessibilityRole="button"
-                  accessibilityLabel={isFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+                  accessibilityLabel={isFavorite ? t('Retirer des favoris') : t('Ajouter aux favoris')}
                   accessibilityState={{ selected: isFavorite }}
                 >
                   <Ionicons name={isFavorite ? 'heart' : 'heart-outline'} size={19} color={isFavorite ? colors.tomato : colors.ink} />
@@ -97,29 +98,28 @@ export default function MealDetail() {
 
         <View style={styles.sheet}>
           <View style={{ flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' }}>
-            <Badge label={`${cuisine.emoji} ${cuisine.fr}`} />
-            {meal.mode !== 'sale' && <Badge label={meal.mode === 'swap' ? 'Échange' : 'Achat ou échange'} tone="forest" icon="swap-horizontal" />}
-            {meal.aiAssisted && <Badge label="Analyse IA vérifiée" tone="saffron" icon="sparkles" />}
+            <Badge label={`${cuisine.emoji} ${tr(cuisine)}`} />
+            {meal.mode !== 'sale' && <Badge label={meal.mode === 'swap' ? t('Échange') : t('Achat ou échange')} tone="forest" icon="swap-horizontal" />}
+            {meal.aiAssisted && <Badge label={t('Analyse IA vérifiée')} tone="saffron" icon="sparkles" />}
           </View>
           <Text style={type.h1}>{meal.title}</Text>
           <View style={styles.metaRow}>
-            <Meta icon="time-outline" label={`Encore ${timeLeft(meal.availableUntil)}`} />
+            <Meta icon="time-outline" label={t('Encore {0}', { 0: timeLeft(meal.availableUntil) })} />
             <Meta icon="location-outline" label={formatDistance(meal.distanceKm) || meal.pickupArea.split('—')[0]} />
-            <Meta icon="layers-outline" label={`${meal.portionsLeft}/${meal.portionsTotal} portions`} />
+            <Meta icon="layers-outline" label={t('{0}/{1} portions', { 0: meal.portionsLeft, 1: meal.portionsTotal })} />
           </View>
 
           {blocked ? (
             <View style={[styles.safety, { backgroundColor: colors.dangerSoft }]}>
               <Ionicons name="warning" size={20} color={colors.danger} />
-              <Text style={[type.bodyStrong, { flex: 1, color: colors.danger }]}>
-                Déconseillé pour vous : contient {[...verdict.conflicts, ...verdict.traceConflicts].map((c) => allergenById(c).fr).join(', ')}.
+              <Text style={[type.bodyStrong, { flex: 1, color: colors.danger }]}>{t('Déconseillé pour vous : contient')}{' '}{[...verdict.conflicts, ...verdict.traceConflicts].map((c) => tr(allergenById(c))).join(', ')}.
               </Text>
             </View>
           ) : (
             health.allergens.length > 0 && (
               <View style={[styles.safety, { backgroundColor: colors.sage }]}>
                 <Ionicons name="shield-checkmark" size={20} color={colors.forest} />
-                <Text style={[type.bodyStrong, { flex: 1, color: colors.forest }]}>Compatible avec votre profil santé</Text>
+                <Text style={[type.bodyStrong, { flex: 1, color: colors.forest }]}>{t('Compatible avec vos préférences alimentaires')}</Text>
               </View>
             )
           )}
@@ -129,29 +129,29 @@ export default function MealDetail() {
           <Pressable style={styles.cooker}>
             <Avatar uri={meal.cooker.avatarUrl} name={meal.cooker.displayName} size={52} verified={meal.cooker.isVerified} />
             <View style={{ flex: 1, gap: 4 }}>
-              <Text style={type.bodyStrong}>Cuisiné par {meal.cooker.displayName}</Text>
+              <Text style={type.bodyStrong}>{t('Cuisiné par')}{' '}{meal.cooker.displayName}</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
                 <RatingPill rating={meal.cooker.cookerRating} count={meal.cooker.cookerRatingCount} />
                 <Text style={type.caption}>{meal.cooker.neighborhood}</Text>
               </View>
-              {meal.cooker.badges.length > 0 && <Text style={[type.caption, { color: colors.forest }]}>{meal.cooker.badges.join(' · ')}</Text>}
+              {meal.cooker.badges.length > 0 && <Text style={[type.caption, { color: colors.forest }]}>{meal.cooker.badges.map((b) => t(b)).join(' · ')}</Text>}
             </View>
           </Pressable>
 
           <Divider />
           <View style={{ gap: spacing.md }}>
-            <Text style={type.h3}>Allergènes</Text>
+            <Text style={type.h3}>{t('Allergènes')}</Text>
             <AllergenList codes={meal.allergens} mayContain={meal.mayContain} conflicts={verdict.conflicts} />
-            <Text style={type.caption}>Déclaration validée par le Cooker. Préparé dans une cuisine domestique.</Text>
+            <Text style={type.caption}>{t('Déclaration validée par le Cooker. Préparé dans une cuisine domestique.')}</Text>
           </View>
 
           <View style={{ gap: spacing.md }}>
-            <Text style={type.h3}>Ingrédients</Text>
+            <Text style={type.h3}>{t('Ingrédients')}</Text>
             <Text style={type.body}>{meal.ingredients.map((i) => i.name).join(' · ')}</Text>
             {meal.diets.length > 0 && (
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
                 {meal.diets.map((d) => (
-                  <Badge key={d} label={DIETS.find((x) => x.id === d)?.fr ?? d} tone="forest" icon="leaf-outline" />
+                  <Badge key={d} label={tr(DIETS.find((x) => x.id === d) ?? { fr: d, en: d })} tone="forest" icon="leaf-outline" />
                 ))}
               </View>
             )}
@@ -160,16 +160,16 @@ export default function MealDetail() {
           <View style={styles.pickup}>
             <Ionicons name="walk-outline" size={22} color={colors.forest} />
             <View style={{ flex: 1 }}>
-              <Text style={type.bodyStrong}>Cueillette</Text>
+              <Text style={type.bodyStrong}>{t('Cueillette')}</Text>
               <Text style={type.caption}>{meal.pickupArea}</Text>
-              <Text style={type.caption}>Adresse exacte partagée dans le chat après confirmation.</Text>
+              <Text style={type.caption}>{t('Adresse exacte partagée dans le chat après confirmation.')}</Text>
             </View>
           </View>
 
           <Divider />
           <View style={{ gap: spacing.lg }}>
-            <Text style={type.h3}>Avis sur {meal.cooker.displayName.split(' ')[0]}</Text>
-            {reviews.length === 0 && <Text style={type.body}>Pas encore d'avis — soyez le premier à goûter !</Text>}
+            <Text style={type.h3}>{t('Avis sur')}{' '}{meal.cooker.displayName.split(' ')[0]}</Text>
+            {reviews.length === 0 && <Text style={type.body}>{t('Pas encore d\'avis — soyez le premier à goûter !')}</Text>}
             {reviews.map((r) => (
               <View key={r.id} style={{ gap: spacing.sm }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
@@ -192,7 +192,7 @@ export default function MealDetail() {
               accessibilityRole="button"
             >
               <Ionicons name="flag-outline" size={16} color={colors.muted} />
-              <Text style={type.caption}>Signaler ce plat ou un problème</Text>
+              <Text style={type.caption}>{t('Signaler ce plat ou un problème')}</Text>
             </Pressable>
           )}
         </View>
@@ -204,16 +204,16 @@ export default function MealDetail() {
             {formatPrice(meal.priceCents)}
           </Text>
           <Text style={type.caption} numberOfLines={1}>
-            {meal.priceCents != null ? 'par portion' : 'contre un de vos plats'}
+            {meal.priceCents != null ? t('par portion') : t('contre un de vos plats')}
           </Text>
         </View>
         {mine ? (
-          <Button title="Gérer mes plats" size="md" icon="storefront-outline" onPress={() => router.push('/my-meals')} />
+          <Button title={t('Gérer mes plats')} size="md" icon="storefront-outline" onPress={() => router.push('/my-meals')} />
         ) : (
           <View style={{ flexDirection: 'row', gap: spacing.sm }}>
             {meal.mode !== 'sale' && (
               <Button
-                title="Échanger"
+                title={t('Échanger')}
                 variant={meal.mode === 'swap' ? 'primary' : 'secondary'}
                 icon="swap-horizontal"
                 size="md"
@@ -223,7 +223,7 @@ export default function MealDetail() {
             )}
             {meal.mode !== 'swap' && (
               <Button
-                title="Commander"
+                title={t('Commander')}
                 variant="accent"
                 size="md"
                 disabled={blocked}

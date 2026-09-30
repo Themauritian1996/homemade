@@ -51,6 +51,8 @@ insert into public.cuisines (code, name_fr, name_en, emoji) values
   ('caribbean',      'Caribéen',      'Caribbean',      '🌴'),
   ('mediterranean',  'Méditerranéen', 'Mediterranean',  '🫒'),
   ('healthy_bowl',   'Bol santé',     'Healthy bowl',   '🥗'),
+  ('meal_prep',      'Meal prep',     'Meal prep',      '🍱'),
+  ('breakfast',      'Déjeuner & brunch', 'Breakfast & brunch', '🥞'),
   ('dessert',        'Dessert',       'Dessert',        '🍰'),
   ('other',          'Autre',         'Other',          '🍽️')
 on conflict (code) do nothing;

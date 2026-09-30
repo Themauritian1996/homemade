@@ -2,8 +2,10 @@
 // de base de données, pas de connexion Postgres directe). Utilisé par les robots GitHub :
 //   node scripts/supabase-deploy.mjs check        diagnostic (projets visibles, accès SQL, migrations appliquées)
 //   node scripts/supabase-deploy.mjs migrate      applique les migrations manquantes (dans l'ordre) + référentiels (seed)
-//   node scripts/supabase-deploy.mjs auth         réglages d'inscription pour la bêta (sans courriel de confirmation)
+//   node scripts/supabase-deploy.mjs auth         réglages d'inscription (courriels par Gmail si GMAIL_ADDRESS/GMAIL_APP_PASSWORD, sinon sans courriel)
 //   node scripts/supabase-deploy.mjs app-config   écrit l'URL et la clé PUBLIQUE du projet dans $GITHUB_ENV (pour l'APK)
+//   node scripts/supabase-deploy.mjs robot-create  compte de test temporaire (test sur émulateur Android) → $GITHUB_ENV
+//   node scripts/supabase-deploy.mjs robot-delete  supprime ce compte et tout ce qu'il a créé
 // Variables : SUPABASE_ACCESS_TOKEN (secret), SUPABASE_PROJECT_REF (identifiant du projet, non secret).
 // N'affiche jamais de clé : seule la clé publique (anon/publishable) est transmise à l'APK, comme avant.
 import fs from 'node:fs';
@@ -133,16 +135,65 @@ async function migrate() {
   console.log(`Vérification : ${n?.[0]?.allergens} allergènes, ${n?.[0]?.invites} code(s) d'invitation.`);
 }
 
+// Courriels de l'app (code de confirmation, mot de passe oublié) : un code à 6 chiffres à taper dans l'app,
+// pas de lien à ouvrir (fonctionne sur tous les téléphones). Bilingues, comme l'app.
+const EMAIL = (titleFr, bodyFr, titleEn, bodyEn) => `<div style="font-family:Helvetica,Arial,sans-serif;max-width:480px;margin:auto;color:#1B1A17">
+<h2 style="color:#1F3A2E;margin-bottom:4px">${titleFr}</h2>
+<p>${bodyFr}</p>
+<p style="font-size:32px;font-weight:bold;letter-spacing:6px;color:#1F3A2E;background:#FAF6EF;border-radius:12px;padding:16px;text-align:center">{{ .Token }}</p>
+<p style="color:#8A857B;font-size:13px">Ce code expire dans 1 heure. Si vous n'êtes pas à l'origine de cette demande, ignorez ce courriel.</p>
+<hr style="border:none;border-top:1px solid #E8E0D3;margin:24px 0">
+<p style="font-size:14px"><b>${titleEn}</b><br>${bodyEn}</p>
+<p style="color:#8A857B;font-size:12px">homemade. — des repas faits maison entre voisins</p></div>`;
+
 async function auth() {
-  // Bêta entre amis : pas de courriel de confirmation (le SMTP gratuit de Supabase est limité à quelques courriels/heure).
+  const base = { password_min_length: 8, site_url: 'homemade://', uri_allow_list: 'homemade://**,exp://**' };
+  const smtpUser = process.env.GMAIL_ADDRESS || process.env.SMTP_USER || '';
+  const smtpPass = (process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS || '').replace(/\s+/g, '');
+  const smtpHost = process.env.SMTP_HOST || (process.env.GMAIL_ADDRESS ? 'smtp.gmail.com' : '');
+  if (!smtpUser || !smtpPass || !smtpHost) {
+    // Sans service de courriel : inscription immédiate (le courriel intégré de Supabase n'écrit qu'aux membres de l'équipe).
+    const r = await api('PATCH', `/projects/${ref}/config/auth`, { ...base, mailer_autoconfirm: true });
+    if (r.status >= 300) console.log(`::warning::Réglages d'inscription non appliqués (HTTP ${r.status}) : ${(r.json?.message ?? r.text).slice(0, 300)}`);
+    else console.log('✓ Inscription immédiate, sans courriel (ajoutez GMAIL_ADDRESS + GMAIL_APP_PASSWORD pour les codes par courriel).');
+    return;
+  }
   const r = await api('PATCH', `/projects/${ref}/config/auth`, {
-    mailer_autoconfirm: true,
-    password_min_length: 8,
-    site_url: 'homemade://',
-    uri_allow_list: 'homemade://**,exp://**',
+    ...base,
+    mailer_autoconfirm: false,
+    smtp_host: smtpHost,
+    smtp_port: String(process.env.SMTP_PORT || 465),
+    smtp_user: smtpUser,
+    smtp_pass: smtpPass,
+    smtp_admin_email: process.env.SMTP_SENDER || smtpUser,
+    smtp_sender_name: 'Homemade',
+    mailer_otp_exp: 3600,
+    mailer_subjects_confirmation: 'Votre code Homemade / Your Homemade code',
+    mailer_templates_confirmation_content: EMAIL(
+      'Bienvenue à la table !',
+      'Voici votre code pour confirmer votre compte Homemade. Entrez-le dans l’app :',
+      'Welcome to Homemade!',
+      'Enter this code in the app to confirm your account: {{ .Token }}',
+    ),
+    mailer_subjects_recovery: 'Nouveau mot de passe Homemade / Reset your Homemade password',
+    mailer_templates_recovery_content: EMAIL(
+      'Mot de passe oublié ?',
+      'Entrez ce code dans l’app pour choisir un nouveau mot de passe :',
+      'Forgot your password?',
+      'Enter this code in the app to choose a new password: {{ .Token }}',
+    ),
   });
-  if (r.status >= 300) console.log(`::warning::Réglages d'inscription non appliqués (HTTP ${r.status}) : ${(r.json?.message ?? r.text).slice(0, 300)}`);
-  else console.log('✓ Inscription sans courriel de confirmation (bêta).');
+  if (r.status >= 300) {
+    // Échec : on garde des inscriptions possibles plutôt que de bloquer les nouveaux testeurs.
+    console.log(`::warning::Service de courriel non appliqué (HTTP ${r.status}) : ${(r.json?.message ?? r.text).slice(0, 300)}`);
+    await api('PATCH', `/projects/${ref}/config/auth`, { ...base, mailer_autoconfirm: true });
+    console.log('Inscription immédiate conservée (sans courriel).');
+    return;
+  }
+  console.log(`✓ Courriels activés (${smtpHost}, expéditeur ${smtpUser.replace(/^(.).*(@.*)$/, '$1…$2')}) : code de confirmation + mot de passe oublié.`);
+  // Plafond d'envois par heure (facultatif : réglage ignoré s'il n'est pas reconnu).
+  const rl = await api('PATCH', `/projects/${ref}/config/auth`, { rate_limit_email_sent: 60 });
+  if (rl.status >= 300) console.log(`  (plafond d'envois non modifié : HTTP ${rl.status})`);
 }
 
 async function appConfig() {
@@ -155,6 +206,68 @@ async function appConfig() {
   const out = process.env.GITHUB_ENV;
   if (out) fs.appendFileSync(out, `EXPO_PUBLIC_SUPABASE_URL=${url}\nEXPO_PUBLIC_SUPABASE_ANON_KEY=${pub.api_key}\n`);
   console.log(`✓ App branchée sur ${url} (clé publique « ${pub.name} »).`);
+}
+
+// ─────────────────────────────────────────────── Compte robot (test de l'APK sur émulateur Android)
+async function serviceKey() {
+  const keys = await api('GET', `/projects/${ref}/api-keys?reveal=true`);
+  if (keys.status !== 200) fail(`Clés du projet illisibles (HTTP ${keys.status}).`);
+  const service = (keys.json.find((k) => k.name === 'service_role') ?? keys.json.find((k) => k.type === 'secret'))?.api_key;
+  if (!service) fail('Clé service introuvable.');
+  console.log(`::add-mask::${service}`);
+  return service;
+}
+
+async function adminAuth(service, method, p, body) {
+  const res = await fetch(`https://${ref}.supabase.co${p}`, {
+    method,
+    headers: { apikey: service, Authorization: `Bearer ${service}`, 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const text = await res.text();
+  let json = null;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    // réponse non JSON
+  }
+  return { status: res.status, json, text };
+}
+
+async function purgeUser(service, id) {
+  await sql(
+    `delete from public.meals where cooker_id = '${id}'; delete from public.beta_invites where created_by = '${id}'; delete from public.beta_feedback where user_id = '${id}'; delete from public.ai_analyses where user_id = '${id}';`,
+  ).catch(() => {});
+  return adminAuth(service, 'DELETE', `/auth/v1/admin/users/${id}`);
+}
+
+async function robotCreate() {
+  const service = await serviceKey();
+  const code = `ROBOT-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+  const email = `robot-test-e2e-${Date.now()}@homemade-test.invalid`;
+  const password = `Robot${Math.random().toString(36).slice(2, 10)}A1`;
+  await sql(`insert into public.beta_invites (code, note, max_uses) values ('${code}', 'Test émulateur (supprimé après usage)', 1)`);
+  try {
+    const cu = await adminAuth(service, 'POST', '/auth/v1/admin/users', { email, password, email_confirm: true, user_metadata: { display_name: 'Robot', invite_code: code } });
+    const id = cu.json?.id ?? cu.json?.user?.id;
+    if (!id) fail(`Compte robot non créé (HTTP ${cu.status}) : ${cu.text.slice(0, 200)}`);
+    console.log(`::add-mask::${password}`);
+    if (process.env.GITHUB_ENV) fs.appendFileSync(process.env.GITHUB_ENV, `ROBOT_EMAIL=${email}\nROBOT_PASSWORD=${password}\nROBOT_ID=${id}\n`);
+    console.log(`✓ Compte robot créé (${email}).`);
+  } finally {
+    await sql(`delete from public.beta_invites where code = '${code}'`).catch(() => {});
+  }
+}
+
+async function robotDelete() {
+  const service = await serviceKey();
+  const ids = new Set([process.env.ROBOT_ID].filter(Boolean));
+  const old = await sql(`select id from auth.users where email like 'robot-test-e2e-%@homemade-test.invalid' and created_at < now() - interval '2 hours'`).catch(() => []);
+  for (const u of old ?? []) ids.add(u.id);
+  for (const id of ids) {
+    const d = await purgeUser(service, id);
+    console.log(`Compte robot ${id} : suppression HTTP ${d.status}`);
+  }
 }
 
 // ─────────────────────────────────────────────── Test de bout en bout sur le vrai serveur
@@ -214,10 +327,22 @@ async function smoke(imagePath) {
     if (bad.json?.user?.id) await admin('DELETE', `/auth/v1/admin/users/${bad.json.user.id}`);
 
     const password = `Robot-${Math.random().toString(36).slice(2)}-A1`;
-    const su = await http('POST', '/auth/v1/signup', { body: { email, password, data: { display_name: 'Robot test', invite_code: code } } });
-    userId = su.json?.user?.id ?? su.json?.id ?? null;
-    const jwt = su.json?.access_token;
-    step(su.status === 200 && Boolean(jwt), 'Inscription avec code (sans courriel de confirmation)', `HTTP ${su.status}${jwt ? '' : ' — ' + su.text.slice(0, 200)}`);
+    const settings = await http('GET', '/auth/v1/settings');
+    const emailCodes = settings.json?.mailer_autoconfirm === false;
+    let jwt = null;
+    if (!emailCodes) {
+      const su = await http('POST', '/auth/v1/signup', { body: { email, password, data: { display_name: 'Robot test', invite_code: code } } });
+      userId = su.json?.user?.id ?? su.json?.id ?? null;
+      jwt = su.json?.access_token;
+      step(su.status === 200 && Boolean(jwt), 'Inscription avec code (sans courriel de confirmation)', `HTTP ${su.status}${jwt ? '' : ' — ' + su.text.slice(0, 200)}`);
+    } else {
+      // Courriels actifs : aucun envoi vers une adresse fictive ; compte confirmé créé par l'API admin (même trigger d'invitation).
+      const cu = await admin('POST', '/auth/v1/admin/users', { email, password, email_confirm: true, user_metadata: { display_name: 'Robot test', invite_code: code } });
+      userId = cu.json?.id ?? cu.json?.user?.id ?? null;
+      const tk = await http('POST', '/auth/v1/token?grant_type=password', { body: { email, password } });
+      jwt = tk.json?.access_token;
+      step(cu.status === 200 && Boolean(jwt), 'Inscription avec code + connexion (courriels de confirmation actifs)', `HTTP ${cu.status}/${tk.status}${jwt ? '' : ' — ' + (cu.text + tk.text).slice(0, 200)}`);
+    }
     if (!jwt) throw new Error('inscription impossible');
     const as = (m, p, o = {}) => http(m, p, { ...o, token: jwt });
 
@@ -298,6 +423,8 @@ try {
   else if (command === 'migrate') await migrate();
   else if (command === 'auth') await auth();
   else if (command === 'app-config') await appConfig();
+  else if (command === 'robot-create') await robotCreate();
+  else if (command === 'robot-delete') await robotDelete();
   else fail(`Commande inconnue : ${command}`);
 } catch (e) {
   fail(e instanceof Error ? e.message : String(e));

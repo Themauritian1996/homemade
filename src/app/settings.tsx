@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, Share, StyleSheet, Switch, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LanguageToggle } from '@/components/LanguageToggle';
 import { Avatar, Button, Card, Chip, Divider, ListRow, ScreenHeader, TextField } from '@/components/ui';
 import { DEMO_MODE } from '@/lib/config';
 import { friendlyError } from '@/lib/errors';
@@ -12,6 +13,7 @@ import { appVersion, deleteMyAccount, EditableProfile, exportMyData, loadAccount
 import { useApp } from '@/store/app';
 import { colors, radius, spacing, type } from '@/theme';
 
+import { t } from '@/i18n';
 const RADII = [2, 5, 10, 15, 25];
 
 export default function SettingsScreen() {
@@ -32,13 +34,13 @@ export default function SettingsScreen() {
         setProfile({ ...p, displayName: p.displayName || user.displayName });
         setSettings(s);
       })
-      .catch((e) => Alert.alert('Chargement impossible', friendlyError(e)));
+      .catch((e) => Alert.alert(t('Chargement impossible'), friendlyError(e)));
   }, [user]);
 
   if (!user || !profile || !settings) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.bg }}>
-        <ScreenHeader title="Paramètres" />
+        <ScreenHeader title={t('Paramètres')} />
         <ActivityIndicator color={colors.forest} style={{ marginTop: spacing.huge }} />
       </View>
     );
@@ -48,18 +50,18 @@ export default function SettingsScreen() {
     const next = { ...settings, ...patch };
     setSettings(next);
     if (patch.defaultRadiusKm) setFilters({ radiusKm: patch.defaultRadiusKm });
-    saveSettings(user.id, next).catch((e) => Alert.alert('Préférence non enregistrée', friendlyError(e)));
+    saveSettings(user.id, next).catch((e) => Alert.alert(t('Préférence non enregistrée'), friendlyError(e)));
   };
 
   const submitProfile = async () => {
-    if (profile.displayName.trim().length < 2) return Alert.alert('Prénom', 'Indiquez au moins 2 caractères.');
+    if (profile.displayName.trim().length < 2) return Alert.alert(t('Prénom'), t('Indiquez au moins 2 caractères.'));
     setSavingProfile(true);
     try {
       await saveProfile(user.id, profile);
       setUser({ ...user, displayName: profile.displayName.trim() });
-      Alert.alert('Profil enregistré', 'Vos voisins voient maintenant ces informations.');
+      Alert.alert(t('Profil enregistré'), t('Vos voisins voient maintenant ces informations.'));
     } catch (e) {
-      Alert.alert('Enregistrement impossible', friendlyError(e));
+      Alert.alert(t('Enregistrement impossible'), friendlyError(e));
     } finally {
       setSavingProfile(false);
     }
@@ -67,7 +69,7 @@ export default function SettingsScreen() {
 
   const changeAvatar = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) return Alert.alert('Permission requise', 'Autorisez l’accès aux photos dans les réglages du téléphone.');
+    if (!perm.granted) return Alert.alert(t('Permission requise'), t('Autorisez l’accès aux photos dans les réglages du téléphone.'));
     const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.6 });
     if (res.canceled || !res.assets[0]) return;
     setUploading(true);
@@ -75,7 +77,7 @@ export default function SettingsScreen() {
       const url = await uploadAvatar(user.id, res.assets[0].uri, profile.avatarUrl);
       setProfile({ ...profile, avatarUrl: url });
     } catch (e) {
-      Alert.alert('Photo non enregistrée', friendlyError(e));
+      Alert.alert(t('Photo non enregistrée'), friendlyError(e));
     } finally {
       setUploading(false);
     }
@@ -85,9 +87,9 @@ export default function SettingsScreen() {
     setBusy('export');
     try {
       const json = await exportMyData();
-      await Share.share({ title: 'Mes données Homemade', message: json });
+      await Share.share({ title: t('Mes données Homemade'), message: json });
     } catch (e) {
-      Alert.alert('Export impossible', friendlyError(e));
+      Alert.alert(t('Export impossible'), friendlyError(e));
     } finally {
       setBusy(null);
     }
@@ -95,12 +97,12 @@ export default function SettingsScreen() {
 
   const deleteAccount = () =>
     Alert.alert(
-      'Supprimer mon compte ?',
-      'Vos annonces sont retirées, votre profil santé et vos photos sont effacés, votre profil public devient « Membre supprimé ». Cette action est définitive.',
+      t('Supprimer mon compte ?'),
+      t('Vos annonces sont retirées, votre profil santé et vos photos sont effacés, votre profil public devient « Membre supprimé ». Cette action est définitive.'),
       [
-        { text: 'Annuler', style: 'cancel' },
+        { text: t('Annuler'), style: 'cancel' },
         {
-          text: 'Supprimer définitivement',
+          text: t('Supprimer définitivement'),
           style: 'destructive',
           onPress: async () => {
             setBusy('delete');
@@ -108,7 +110,7 @@ export default function SettingsScreen() {
               await deleteMyAccount(user.id);
             } catch (e) {
               setBusy(null);
-              Alert.alert('Suppression impossible', friendlyError(e));
+              Alert.alert(t('Suppression impossible'), friendlyError(e));
             }
           },
         },
@@ -117,109 +119,113 @@ export default function SettingsScreen() {
 
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScreenHeader title="Paramètres" />
+      <ScreenHeader title={t('Paramètres')} />
       <ScrollView
         contentContainerStyle={{ padding: spacing.xl, paddingTop: spacing.sm, gap: spacing.xl, paddingBottom: insets.bottom + spacing.huge }}
         keyboardShouldPersistTaps="handled"
       >
-        <Section title="Profil public">
+        <Section title={t('Profil public')}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.lg }}>
-            <Pressable onPress={changeAvatar} accessibilityRole="button" accessibilityLabel="Changer la photo de profil">
+            <Pressable onPress={changeAvatar} accessibilityRole="button" accessibilityLabel={t('Changer la photo de profil')}>
               <Avatar name={profile.displayName || '?'} uri={profile.avatarUrl} size={72} />
               <View style={styles.avatarBadge}>
                 {uploading ? <ActivityIndicator size="small" color={colors.onDark} /> : <Ionicons name="camera" size={14} color={colors.onDark} />}
               </View>
             </Pressable>
-            <Text style={[type.caption, { flex: 1 }]}>Une photo de vous (ou de votre cuisine) inspire confiance à vos voisins.</Text>
+            <Text style={[type.caption, { flex: 1 }]}>{t('Une photo de vous (ou de votre cuisine) inspire confiance à vos voisins.')}</Text>
           </View>
           <TextField
-            label="Prénom"
+            label={t('Prénom')}
             value={profile.displayName}
             onChangeText={(displayName) => setProfile({ ...profile, displayName })}
             maxLength={40}
             icon="person-outline"
           />
           <TextField
-            label="Quartier"
+            label={t('Quartier')}
             value={profile.neighborhood}
             onChangeText={(neighborhood) => setProfile({ ...profile, neighborhood })}
-            placeholder="Ex. Rosemont"
+            placeholder={t('Ex. Rosemont')}
             maxLength={80}
             icon="home-outline"
           />
           <TextField
-            label="À propos de moi"
+            label={t('À propos de moi')}
             value={profile.bio}
             onChangeText={(bio) => setProfile({ ...profile, bio })}
-            placeholder="Ce que vous aimez cuisiner, vos spécialités…"
+            placeholder={t('Ce que vous aimez cuisiner, vos spécialités…')}
             multiline
             maxLength={400}
             style={{ minHeight: 80, textAlignVertical: 'top' }}
           />
-          <Button title="Enregistrer le profil" onPress={submitProfile} loading={savingProfile} size="md" />
+          <Button title={t('Enregistrer le profil')} onPress={submitProfile} loading={savingProfile} size="md" />
         </Section>
 
-        <Section title="Recherche">
-          <Text style={type.caption}>Rayon utilisé par défaut dans le fil et sur la carte.</Text>
+        <Section title={t('Langue · Language')}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+            <Text style={[type.body, { flex: 1 }]}>{t('Langue de l\'application')}</Text>
+            <LanguageToggle />
+          </View>
+        </Section>
+
+        <Section title={t('Recherche')}>
+          <Text style={type.caption}>{t('Rayon utilisé par défaut dans le fil et sur la carte.')}</Text>
           <View style={styles.wrap}>
             {RADII.map((r) => (
-              <Chip key={r} label={`${r} km`} selected={settings.defaultRadiusKm === r} onPress={() => updateSettings({ defaultRadiusKm: r })} />
+              <Chip key={r} label={t('{0} km', { 0: r })} selected={settings.defaultRadiusKm === r} onPress={() => updateSettings({ defaultRadiusKm: r })} />
             ))}
           </View>
         </Section>
 
-        <Section title="Notifications">
+        <Section title={t('Notifications')}>
           <Card>
-            <SwitchRow label="Nouveaux messages et commandes" value={settings.notifyMessages} onChange={(v) => updateSettings({ notifyMessages: v })} />
+            <SwitchRow label={t('Nouveaux messages et commandes')} value={settings.notifyMessages} onChange={(v) => updateSettings({ notifyMessages: v })} />
             <Divider />
-            <SwitchRow label="Nouveaux plats près de chez moi" value={settings.notifyNewNearby} onChange={(v) => updateSettings({ notifyNewNearby: v })} />
+            <SwitchRow label={t('Nouveaux plats près de chez moi')} value={settings.notifyNewNearby} onChange={(v) => updateSettings({ notifyNewNearby: v })} />
           </Card>
-          <Text style={type.caption}>
-            Pendant la bêta, les nouveautés s'affichent par des pastilles dans l'app (onglet Messages). Les notifications sur le téléphone arrivent bientôt :
-            vos choix seront respectés.
-          </Text>
+          <Text style={type.caption}>{t('Pendant la bêta, les nouveautés s\'affichent par des pastilles dans l\'app (onglet Messages). Les notifications sur le téléphone arrivent bientôt : vos choix seront respectés.')}</Text>
         </Section>
 
-        <Section title="Confidentialité et données (Loi 25)">
+        <Section title={t('Confidentialité et données (Loi 25)')}>
           <Card>
             <ListRow
               icon="download-outline"
-              title="Obtenir une copie de mes données"
-              subtitle="Profil, profil santé, plats, commandes, messages"
+              title={t('Obtenir une copie de mes données')}
+              subtitle={t('Profil, profil santé, plats, commandes, messages')}
               onPress={busy ? undefined : exportData}
               right={busy === 'export' ? <ActivityIndicator color={colors.forest} /> : undefined}
             />
             <Divider />
             <ListRow
               icon="document-text-outline"
-              title="Politique de confidentialité"
+              title={t('Politique de confidentialité')}
               onPress={() => router.push({ pathname: '/legal/[doc]', params: { doc: 'privacy' } })}
             />
             <Divider />
             <ListRow
               icon="reader-outline"
-              title="Conditions d'utilisation"
+              title={t('Conditions d\'utilisation')}
               onPress={() => router.push({ pathname: '/legal/[doc]', params: { doc: 'terms' } })}
             />
             <Divider />
             <ListRow
               icon="trash-outline"
               tone="danger"
-              title="Supprimer mon compte"
-              subtitle="Définitif"
+              title={t('Supprimer mon compte')}
+              subtitle={t('Définitif')}
               onPress={busy ? undefined : deleteAccount}
               right={busy === 'delete' ? <ActivityIndicator color={colors.danger} /> : undefined}
             />
           </Card>
         </Section>
 
-        <Section title="À propos">
+        <Section title={t('À propos')}>
           <Card>
-            <InfoRow label="Version" value={`${appVersion()}${DEMO_MODE ? ' · démo' : ''}`} />
+            <InfoRow label={t('Version')} value={`${appVersion()}${DEMO_MODE ? ` · ${t('démo')}` : ''}`} />
             <Divider />
-            <InfoRow label="Analyse IA" value={aiProviderLabel()} />
+            <InfoRow label={t('Analyse IA')} value={aiProviderLabel()} />
             <Divider />
-            <InfoRow label="Compte" value={user.email || '—'} />
+            <InfoRow label={t('Compte')} value={user.email || '—'} />
           </Card>
         </Section>
       </ScrollView>

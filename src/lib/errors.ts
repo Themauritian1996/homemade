@@ -2,6 +2,8 @@
  * Messages d'erreur lisibles (français québécois) à partir des erreurs Supabase Auth, des codes
  * levés par les fonctions SQL (ex. « HEALTH_PROFILE_CONFLICT: … ») et des erreurs réseau.
  */
+import { t } from '@/i18n';
+
 const MESSAGES: [RegExp, string][] = [
   [
     /INVITE_CODE_INVALID|Database error saving new user/i,
@@ -9,7 +11,8 @@ const MESSAGES: [RegExp, string][] = [
   ],
   [/User already registered|already been registered/i, 'Un compte existe déjà avec ce courriel. Connectez-vous plutôt.'],
   [/Invalid login credentials/i, 'Courriel ou mot de passe incorrect.'],
-  [/Email not confirmed/i, 'Confirmez d’abord votre courriel (lien reçu à l’inscription).'],
+  [/Email not confirmed/i, 'Confirmez d’abord votre courriel avec le code reçu à l’inscription.'],
+  [/Token has expired|otp_expired|invalid.*(otp|token)/i, 'Code invalide ou expiré. Demandez un nouveau code.'],
   [/rate limit|too many requests|429/i, 'Trop de tentatives. Patientez quelques minutes puis réessayez.'],
   [/Password should be at least/i, 'Le mot de passe doit contenir au moins 8 caractères.'],
   [/HEALTH_PROFILE_CONFLICT/, 'Ce plat n’est pas compatible avec votre profil santé.'],
@@ -29,6 +32,7 @@ const MESSAGES: [RegExp, string][] = [
 
 export function friendlyError(e: unknown, fallback = 'Une erreur est survenue. Réessayez.'): string {
   const raw = e instanceof Error ? e.message : typeof e === 'object' && e && 'message' in e ? String((e as { message: unknown }).message) : String(e ?? '');
-  for (const [re, msg] of MESSAGES) if (re.test(raw)) return msg;
-  return raw && raw.length < 160 && !/^[A-Z_]+(:|$)/.test(raw) ? raw : fallback;
+  for (const [re, msg] of MESSAGES) if (re.test(raw)) return t(msg);
+  // Message déjà lisible (ex. levé par l'app) : traduit s'il figure au dictionnaire.
+  return raw && raw.length < 160 && !/^[A-Z_]+(:|$)/.test(raw) ? t(raw) : t(fallback);
 }

@@ -6,8 +6,10 @@ import type { AllergenCode } from '@/data/allergens';
 import type { AiTextScan, MealIngredient } from '@/types';
 import { expandAllergens } from './safety';
 
+export type DraftIngredient = MealIngredient & { confidence?: number };
+
 export interface ScanDraft {
-  ingredients: MealIngredient[];
+  ingredients: DraftIngredient[];
   /** Allergènes déclarés hors ingrédients. */
   extra: AllergenCode[];
   mayContain: AllergenCode[];
@@ -29,9 +31,17 @@ export function ingredientsFromScan(scan: AiTextScan): MealIngredient[] {
   return scan.ingredients.map((i) => ({ name: i.name, allergens: [...i.allergens], source: 'ai' as const }));
 }
 
-export function mergeScan(draft: ScanDraft, scan: AiTextScan): ScanDraft {
+/**
+ * `likely` : ingrédients probables du plat retenus par le Cooker (proposés par l'IA, absents du texte lu).
+ * Ils s'ajoutent comme suggestions de l'IA, avec leur confiance (badge « probable » dans le formulaire).
+ */
+export function mergeScan(draft: ScanDraft, scan: AiTextScan, likely: NonNullable<AiTextScan['likelyIngredients']> = []): ScanDraft {
   const ingredients = [...draft.ingredients];
-  for (const next of ingredientsFromScan(scan)) {
+  const incoming: DraftIngredient[] = [
+    ...ingredientsFromScan(scan),
+    ...likely.map((i) => ({ name: i.name, allergens: [...i.allergens], source: 'ai' as const, confidence: i.confidence })),
+  ];
+  for (const next of incoming) {
     const idx = ingredients.findIndex((i) => norm(i.name) === norm(next.name));
     if (idx >= 0) ingredients[idx] = { ...ingredients[idx], allergens: union(ingredients[idx].allergens, next.allergens) };
     else ingredients.push(next);

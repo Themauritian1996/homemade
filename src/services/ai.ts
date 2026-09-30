@@ -12,6 +12,7 @@
  * ingrédients, « Contient » et « Peut contenir ». Le résultat s'AJOUTE à l'annonce, puis le Cooker valide.
  */
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
+import { getLang, t } from '@/i18n';
 import { config, DEMO_MODE } from '@/lib/config';
 import { requireSupabase } from '@/lib/supabase';
 import { demoAnalysis, demoTextScan } from '@/data/mock';
@@ -74,10 +75,10 @@ export async function aiAvailable(): Promise<boolean> {
 
 /** Libellé affiché dans les paramètres. */
 export function aiProviderLabel(): string {
-  if (DEMO_MODE) return 'Simulée (mode démo)';
+  if (DEMO_MODE) return t('Simulée (mode démo)');
   if (localAiAvailable()) return `Locale · ${config.localAiModel}`;
-  if (config.aiProvider === 'server') return 'En ligne · Gemini (gratuit)';
-  return 'Désactivée · saisie manuelle';
+  if (config.aiProvider === 'server') return t('En ligne · Gemini (gratuit)');
+  return t('Désactivée · saisie manuelle');
 }
 
 // ───────────────────────────── Analyse d'un plat
@@ -96,7 +97,7 @@ export async function analyzeMealPhoto(photo: PreparedPhoto, photoPath: string |
   }
   if (config.aiProvider !== 'server' || !photoPath) return { analysis: null, aiAnalysisId: null };
   const { data, error } = await requireSupabase().functions.invoke<{ analysis: AiMealAnalysis; analysis_id: string }>('analyze-meal', {
-    body: { photo_path: photoPath, task: 'meal' },
+    body: { photo_path: photoPath, task: 'meal', lang: getLang() },
   });
   if (error) throw error;
   if (!data) throw new Error('Réponse IA vide');
@@ -116,7 +117,7 @@ export async function scanText(uri: string, userId: string): Promise<AiTextScan>
   // Fichier à plat dans le dossier de l'utilisateur (même règle Storage que les photos de plats).
   const path = await upload(photo, `${userId}/ocr-${Date.now()}.jpg`);
   const { data, error } = await requireSupabase().functions.invoke<{ scan: AiTextScan }>('analyze-meal', {
-    body: { photo_path: path, task: 'ocr' },
+    body: { photo_path: path, task: 'ocr', lang: getLang() },
   });
   if (error) throw error;
   if (!data?.scan) throw new Error('Réponse IA vide');
