@@ -30,6 +30,7 @@ import { Badge, Button, Chip, TextField } from '@/components/ui';
 import { ALLERGENS, AllergenCode, CUISINES, CuisineCode, DIETS, DietCode, allergenById } from '@/data/allergens';
 import { config } from '@/lib/config';
 import { friendlyError } from '@/lib/errors';
+import { formatPrice } from '@/lib/format';
 import { declaredAllergens, validateMealDraft } from '@/lib/mealValidation';
 import { expandAllergens } from '@/lib/safety';
 import { ingredientsFromScan, mergeScan } from '@/lib/scanMerge';
@@ -39,7 +40,8 @@ import { publishMeal } from '@/services/meals';
 import { useApp } from '@/store/app';
 import { colors, fonts, radius, shadow, spacing, type } from '@/theme';
 import type { AiMealAnalysis, AiTextScan, GeoPoint, MealIngredient, MealMode } from '@/types';
-
+
+import { t, tr } from '@/i18n';
 /** Sans clé Stripe, la vente est impossible côté serveur : la bêta se fait en mode échange. */
 const SALES_ENABLED = Boolean(config.stripePublishableKey);
 
@@ -48,8 +50,8 @@ async function pickImage(source: 'camera' | 'library', aspect?: [number, number]
   const perm = source === 'camera' ? await ImagePicker.requestCameraPermissionsAsync() : await ImagePicker.requestMediaLibraryPermissionsAsync();
   if (!perm.granted) {
     Alert.alert(
-      'Permission requise',
-      source === 'camera' ? 'Autorisez l’appareil photo dans les réglages du téléphone.' : 'Autorisez l’accès aux photos dans les réglages du téléphone.',
+      t('Permission requise'),
+      source === 'camera' ? t('Autorisez l’appareil photo dans les réglages du téléphone.') : t('Autorisez l’accès aux photos dans les réglages du téléphone.'),
     );
     return null;
   }
@@ -62,6 +64,11 @@ type Step = 'capture' | 'analyzing' | 'review' | 'done';
 
 /** En-dessous de ce seuil, une suggestion IA est marquée « à vérifier ». */
 const LOW_CONFIDENCE = 0.6;
+/** Au-dessus : ingrédient vu sur la photo ; en dessous : ingrédient probable de la recette (à confirmer). */
+const SEEN_CONFIDENCE = 0.85;
+/** Prix de départ suggéré par portion : accessible, pour lancer les échanges entre voisins. */
+const SUGGESTED_PRICE = 5;
+const QUICK_PRICES = [4, 5, 6, 8];
 
 export default function Publish() {
   const [step, setStep] = useState<Step>('capture');
@@ -84,7 +91,7 @@ export default function Publish() {
       path = await uploadMealPhoto(prepared, user?.id ?? 'anon');
       setPhotoPath(path);
     } catch (e) {
-      Alert.alert('Photo non enregistrée', friendlyError(e, 'Vérifiez votre connexion et réessayez.'));
+      Alert.alert(t('Photo non enregistrée'), friendlyError(e, t('Vérifiez votre connexion et réessayez.')));
       setStep('capture');
       return;
     }
@@ -96,7 +103,7 @@ export default function Publish() {
     try {
       const out = await analyzeMealPhoto(prepared, path);
       if (out.analysis && !out.analysis.isFood) {
-        Alert.alert('Hmm…', 'Nous ne reconnaissons pas de plat sur cette photo. Essayez avec une photo plus nette, vue de dessus.');
+        Alert.alert(t('Hmm…'), t('Nous ne reconnaissons pas de plat sur cette photo. Essayez avec une photo plus nette, vue de dessus.'));
         setStep('capture');
         return;
       }
@@ -105,7 +112,7 @@ export default function Publish() {
       setStep('review');
     } catch {
       // L'IA est une aide, jamais un point de blocage : on bascule en saisie manuelle.
-      Alert.alert('Analyse indisponible', 'Vous pouvez remplir l’annonce manuellement.');
+      Alert.alert(t('Analyse indisponible'), t('Vous pouvez remplir l’annonce manuellement.'));
       setAnalysis(null);
       setStep('review');
     }
@@ -132,20 +139,20 @@ function CaptureStep({ onPick }: { onPick: (s: 'camera' | 'library') => void }) 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ paddingTop: insets.top + spacing.xl, padding: spacing.xl, gap: spacing.xl }}>
       <View style={{ gap: spacing.sm }}>
-        <Text style={type.label}>Espace Cooker</Text>
-        <Text style={type.h1}>Partagez votre plat</Text>
+        <Text style={type.label}>{t('Espace Cooker')}</Text>
+        <Text style={type.h1}>{t('Partagez votre cuisine')}</Text>
         <Text style={type.body}>
           {ai !== false
-            ? "Prenez une photo : notre IA prépare l'annonce pour vous — type de plat, ingrédients et allergènes. Vous vérifiez, vous publiez."
-            : 'Prenez une photo, décrivez les ingrédients et déclarez les allergènes. Vos voisins allergiques seront protégés automatiquement.'}
+            ? t('Un plat en trop, une recette de famille, votre meal prep de la semaine ? Prenez une photo : l\'IA prépare l\'annonce et liste les ingrédients habituels. Vous ajustez, vous publiez.')
+            : t('Un plat en trop, une recette de famille, votre meal prep de la semaine ? Prenez une photo et décrivez-le en quelques secondes.')}
         </Text>
         <View style={{ flexDirection: 'row' }}>
           {ai === null ? (
-            <Badge label="Vérification de l'IA…" icon="hourglass-outline" />
+            <Badge label={t('Vérification de l\'IA…')} icon="hourglass-outline" />
           ) : ai ? (
-            <Badge label="IA active · photo + lecture d'étiquettes" tone="forest" icon="sparkles" />
+            <Badge label={t('IA active · photo + lecture d\'étiquettes')} tone="forest" icon="sparkles" />
           ) : (
-            <Badge label="IA indisponible · saisie manuelle" tone="saffron" icon="create-outline" />
+            <Badge label={t('IA indisponible · saisie manuelle')} tone="saffron" icon="create-outline" />
           )}
         </View>
       </View>
@@ -155,23 +162,23 @@ function CaptureStep({ onPick }: { onPick: (s: 'camera' | 'library') => void }) 
         <View style={styles.captureIcon}>
           <Ionicons name="camera" size={34} color={colors.forest} />
         </View>
-        <Text style={[type.h2, { color: colors.onDark }]}>Photographier mon plat</Text>
+        <Text style={[type.h2, { color: colors.onDark }]}>{t('Photographier mon plat')}</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <Ionicons name="sparkles" size={14} color={colors.saffron} />
           <Text style={{ fontFamily: fonts.medium, color: 'rgba(255,255,255,0.85)' }}>
-            {ai !== false ? "Annonce pré-remplie par l'IA en quelques secondes" : 'Annonce prête en une minute'}
+            {ai !== false ? t('Annonce pré-remplie par l\'IA en quelques secondes') : t('Annonce prête en une minute')}
           </Text>
         </View>
       </Pressable>
 
-      <Button title="Choisir dans la galerie" variant="secondary" icon="images-outline" onPress={() => onPick('library')} />
+      <Button title={t('Choisir dans la galerie')} variant="secondary" icon="images-outline" onPress={() => onPick('library')} />
 
       <View style={styles.tips}>
-        <Text style={type.bodyStrong}>Pour une analyse précise</Text>
-        {['Lumière naturelle, vue de dessus ou à 45°', 'Un seul plat par photo, bien cadré', 'Sauces et garnitures visibles si possible'].map((t) => (
-          <View key={t} style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'center' }}>
+        <Text style={type.bodyStrong}>{t('Pour une analyse précise')}</Text>
+        {['Lumière naturelle, vue de dessus ou à 45°', 'Un seul plat par photo, bien cadré', 'Sauces et garnitures visibles si possible'].map((tip) => (
+          <View key={tip} style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'center' }}>
             <Ionicons name="checkmark-circle" size={18} color={colors.success} />
-            <Text style={type.body}>{t}</Text>
+            <Text style={type.body}>{t(tip)}</Text>
           </View>
         ))}
       </View>
@@ -183,15 +190,15 @@ function CaptureStep({ onPick }: { onPick: (s: 'camera' | 'library') => void }) 
 function AnalyzingStep({ uri }: { uri?: string }) {
   const scan = useRef(new Animated.Value(0)).current;
   const [phase, setPhase] = useState(0);
-  const phases = ['Identification du plat…', 'Estimation des ingrédients…', 'Détection des allergènes…'];
+  const phases = [t('Identification du plat…'), t('Estimation des ingrédients…'), t('Ingrédients habituels de la recette…')];
 
   useEffect(() => {
     const loop = Animated.loop(Animated.timing(scan, { toValue: 1, duration: 1600, easing: Easing.inOut(Easing.quad), useNativeDriver: true }));
     loop.start();
-    const t = setInterval(() => setPhase((p) => Math.min(p + 1, phases.length - 1)), 900);
+    const timer = setInterval(() => setPhase((p) => Math.min(p + 1, phases.length - 1)), 900);
     return () => {
       loop.stop();
-      clearInterval(t);
+      clearInterval(timer);
     };
   }, [scan, phases.length]);
 
@@ -206,7 +213,7 @@ function AnalyzingStep({ uri }: { uri?: string }) {
       <View style={{ alignItems: 'center', gap: spacing.sm }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
           <Ionicons name="sparkles" size={18} color={colors.saffron} />
-          <Text style={[type.h2, { color: colors.onDark }]}>Analyse en cours</Text>
+          <Text style={[type.h2, { color: colors.onDark }]}>{t('Analyse en cours')}</Text>
         </View>
         <Text style={{ fontFamily: fonts.medium, color: 'rgba(255,255,255,0.7)', fontSize: 15 }}>{phases[phase]}</Text>
       </View>
@@ -251,7 +258,7 @@ function ReviewStep({
   const [diets, setDiets] = useState<DietCode[]>(analysis?.diets ?? []);
   // Sans Stripe configuré, la vente est impossible côté serveur : on propose l'échange par défaut.
   const [mode, setMode] = useState<MealMode>(SALES_ENABLED ? 'sale' : 'swap');
-  const [price, setPrice] = useState('12');
+  const [price, setPrice] = useState(String(SUGGESTED_PRICE));
   const [portions, setPortions] = useState(3);
   const [hours, setHours] = useState(24);
   const [pickupArea, setPickupArea] = useState('');
@@ -272,7 +279,7 @@ function ReviewStep({
     // Inclut les implications (blé ⇒ gluten) : un allergène implicite se retire en modifiant l'ingrédient source.
     const source = ingredients.find((i) => expandAllergens(i.allergens).has(code));
     if (source) {
-      Alert.alert('Allergène lié à un ingrédient', `« ${allergenById(code).fr} » provient de « ${source.name} ». Modifiez ou retirez l'ingrédient pour le changer.`);
+      Alert.alert(t('Allergène lié à un ingrédient'), t('« {0} » provient de « {1} ». Modifiez ou retirez l\'ingrédient pour le changer.', { 0: tr(allergenById(code)), 1: source.name }));
       return;
     }
     setExtra((x) => (x.includes(code) ? x.filter((c) => c !== code) : [...x, code]));
@@ -288,12 +295,12 @@ function ReviewStep({
 
   const startScan = () =>
     Alert.alert(
-      'Lire une étiquette ou une recette',
-      "Photographiez la liste d'ingrédients d'un produit utilisé (sauce, bouillon, chocolat…) ou votre fiche recette. L'IA ajoute ingrédients et allergènes ; vous vérifiez.",
+      t('Lire une étiquette ou une recette'),
+      t('Photographiez la liste d\'ingrédients d\'un produit utilisé (sauce, bouillon, chocolat…) ou votre fiche recette. L\'IA ajoute ingrédients et allergènes ; vous vérifiez.'),
       [
-        { text: 'Annuler', style: 'cancel' },
-        { text: 'Galerie', onPress: () => runScan('library') },
-        { text: 'Appareil photo', onPress: () => runScan('camera') },
+        { text: t('Annuler'), style: 'cancel' },
+        { text: t('Galerie'), onPress: () => runScan('library') },
+        { text: t('Appareil photo'), onPress: () => runScan('camera') },
       ],
     );
 
@@ -304,14 +311,14 @@ function ReviewStep({
     try {
       setScan(await scanText(uri, userId));
     } catch (e) {
-      Alert.alert('Lecture impossible', `${friendlyError(e, 'L’IA n’a pas pu lire cette photo.')}\n\nAjoutez les ingrédients à la main.`);
+      Alert.alert(t('Lecture impossible'), t('{0}\n\nAjoutez les ingrédients à la main.', { 0: friendlyError(e, 'L’IA n’a pas pu lire cette photo.') }));
     } finally {
       setScanning(false);
     }
   };
 
-  const applyScan = (s: AiTextScan) => {
-    const merged = mergeScan({ ingredients, extra, mayContain }, s);
+  const applyScan = (s: AiTextScan, likely: NonNullable<AiTextScan['likelyIngredients']>) => {
+    const merged = mergeScan({ ingredients, extra, mayContain }, s, likely);
     setIngredients(merged.ingredients);
     setExtra(merged.extra);
     setMayContain(merged.mayContain);
@@ -322,12 +329,12 @@ function ReviewStep({
   const submit = async () => {
     if (!pickupConfirmed) {
       return Alert.alert(
-        'Lieu de cueillette',
-        'Placez l’épingle sur votre lieu de cueillette (ou utilisez votre position actuelle) pour que vos voisins trouvent le plat.',
+        t('Lieu de cueillette'),
+        t('Placez l’épingle sur votre lieu de cueillette (ou utilisez votre position actuelle) pour que vos voisins trouvent le plat.'),
       );
     }
     const errors = validateMealDraft({ title, ingredients, allergens, diets, mode, priceCents, portions, attestation: attested });
-    if (errors.length) return Alert.alert('À compléter', errors.join('\n\n'));
+    if (errors.length) return Alert.alert(t('À compléter'), errors.join('\n\n'));
     setPublishing(true);
     try {
       await publishMeal({
@@ -345,12 +352,12 @@ function ReviewStep({
         portions,
         availableHours: hours,
         pickup,
-        pickupArea: pickupArea.trim() || 'Quartier communiqué après confirmation',
+        pickupArea: pickupArea.trim() || t('Quartier communiqué après confirmation'),
         cookerAttestation: attested,
       });
       onPublished();
     } catch (e) {
-      Alert.alert('Publication impossible', friendlyError(e));
+      Alert.alert(t('Publication impossible'), friendlyError(e));
     } finally {
       setPublishing(false);
     }
@@ -362,7 +369,7 @@ function ReviewStep({
         <View>
           {photo ? <Image source={{ uri: photo.uri }} style={styles.reviewPhoto} contentFit="cover" /> : <View style={[styles.reviewPhoto, { backgroundColor: colors.surfaceAlt }]} />}
           <LinearGradient colors={['rgba(0,0,0,0.4)', 'transparent']} style={[StyleSheet.absoluteFill, { height: 120 }]} />
-          <Pressable onPress={onCancel} style={[styles.closeBtn, { top: insets.top + spacing.sm }]} accessibilityLabel="Annuler">
+          <Pressable onPress={onCancel} style={[styles.closeBtn, { top: insets.top + spacing.sm }]} accessibilityLabel={t('Annuler')}>
             <Ionicons name="close" size={20} color={colors.ink} />
           </Pressable>
         </View>
@@ -372,10 +379,8 @@ function ReviewStep({
             <View style={styles.aiBanner}>
               <Ionicons name="sparkles" size={18} color={colors.warning} />
               <View style={{ flex: 1 }}>
-                <Text style={type.bodyStrong}>Pré-rempli par l'IA — à vérifier</Text>
-                <Text style={type.caption}>
-                  Les éléments marqués « à vérifier » ont une faible confiance. Vous restez responsable de l'exactitude de la déclaration.
-                </Text>
+                <Text style={type.bodyStrong}>{t('Pré-rempli par l\'IA — à vérifier')}</Text>
+                <Text style={type.caption}>{t('Les éléments marqués « à vérifier » ont une faible confiance. Vous restez responsable de l\'exactitude de la déclaration.')}</Text>
                 {analysis.warnings.map((w) => (
                   <Text key={w} style={[type.caption, { color: colors.warning, marginTop: 4 }]}>
                     ⚠︎ {w}
@@ -386,24 +391,27 @@ function ReviewStep({
           ) : (
             <View style={styles.aiBanner}>
               <Ionicons name="create-outline" size={18} color={colors.warning} />
-              <Text style={[type.body, { flex: 1 }]}>Saisie manuelle : décrivez votre plat et déclarez ses allergènes.</Text>
+              <Text style={[type.body, { flex: 1 }]}>{t('Saisie manuelle : décrivez votre plat et déclarez ses allergènes.')}</Text>
             </View>
           )}
 
           <View style={{ gap: spacing.lg }}>
-            <TextField label="Titre" value={title} onChangeText={setTitle} placeholder="Ex. Lasagne végétarienne maison" maxLength={80} />
-            <TextField label="Description" value={description} onChangeText={setDescription} placeholder="Ce qui rend votre plat unique…" multiline maxLength={500} style={{ minHeight: 80, textAlignVertical: 'top' }} />
+            <TextField label={t('Titre')} value={title} onChangeText={setTitle} placeholder={t('Ex. Lasagne végétarienne maison')} maxLength={80} />
+            <TextField label={t('Description')} value={description} onChangeText={setDescription} placeholder={t('Ce qui rend votre plat unique…')} multiline maxLength={500} style={{ minHeight: 80, textAlignVertical: 'top' }} />
           </View>
 
-          <Section title="Type de cuisine">
+          <Section title={t('Type de cuisine')}>
             <View style={styles.wrap}>
               {CUISINES.map((c) => (
-                <Chip key={c.id} emoji={c.emoji} label={c.fr} selected={cuisine === c.id} onPress={() => setCuisine(c.id)} />
+                <Chip key={c.id} emoji={c.emoji} label={tr(c)} selected={cuisine === c.id} onPress={() => setCuisine(c.id)} />
               ))}
             </View>
           </Section>
 
-          <Section title={`Ingrédients · ${ingredients.length}`} hint="Touchez un ingrédient pour ajuster ses allergènes.">
+          <Section
+            title={t('Ingrédients · {0}', { 0: ingredients.length })}
+            hint={analysis ? t('L\'IA a listé les ingrédients habituels de ce plat. Touchez-en un pour le renommer ou ajuster ses allergènes ; retirez ceux que vous n\'avez pas mis.') : t('Touchez un ingrédient pour le renommer ou ajuster ses allergènes.')}
+          >
             <View style={{ gap: spacing.sm }}>
               {ingredients.map((ing, idx) => (
                 <View key={`${ing.name}-${idx}`} style={styles.ingredient}>
@@ -411,16 +419,28 @@ function ReviewStep({
                     <View style={{ flex: 1, gap: 4 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' }}>
                         <Text style={type.bodyStrong}>{ing.name}</Text>
-                        {ing.source === 'ai' && ing.confidence != null && ing.confidence < LOW_CONFIDENCE && <Badge label="à vérifier" tone="saffron" />}
+                        {ing.source === 'ai' && ing.confidence != null && ing.confidence < LOW_CONFIDENCE && <Badge label={t('à vérifier')} tone="saffron" />}
+                        {ing.source === 'ai' && ing.confidence != null && ing.confidence >= LOW_CONFIDENCE && ing.confidence < SEEN_CONFIDENCE && (
+                          <Badge label={t('probable')} tone="neutral" icon="sparkles-outline" />
+                        )}
                       </View>
-                      <Text style={type.caption}>{ing.allergens.length ? ing.allergens.map((a) => `${allergenById(a).emoji} ${allergenById(a).fr}`).join('  ') : 'Aucun allergène'}</Text>
+                      <Text style={type.caption}>{ing.allergens.length ? ing.allergens.map((a) => `${allergenById(a).emoji} ${tr(allergenById(a))}`).join('  ') : t('Aucun allergène')}</Text>
                     </View>
-                    <Pressable hitSlop={8} onPress={() => setIngredients((l) => l.filter((_, i) => i !== idx))} accessibilityLabel={`Retirer ${ing.name}`}>
+                    <Pressable hitSlop={8} onPress={() => setIngredients((l) => l.filter((_, i) => i !== idx))} accessibilityLabel={t('Retirer {0}', { 0: ing.name })}>
                       <Ionicons name="trash-outline" size={18} color={colors.muted} />
                     </Pressable>
                   </Pressable>
                   {editing === idx && (
-                    <View style={{ paddingTop: spacing.md }}>
+                    <View style={{ paddingTop: spacing.md, gap: spacing.md }}>
+                      <TextInput
+                        value={ing.name}
+                        onChangeText={(name) => setIngredients((l) => l.map((x, i) => (i === idx ? { ...x, name, source: 'cooker' } : x)))}
+                        placeholder={t('Nom de l\'ingrédient')}
+                        placeholderTextColor={colors.muted}
+                        style={styles.addInput}
+                        maxLength={60}
+                        accessibilityLabel={t('Nom de l\'ingrédient')}
+                      />
                       <AllergenPicker
                         selected={ing.allergens}
                         onToggle={(code) =>
@@ -437,13 +457,13 @@ function ReviewStep({
                 <TextInput
                   value={newIngredient}
                   onChangeText={setNewIngredient}
-                  placeholder="Ajouter un ingrédient"
+                  placeholder={t('Ajouter un ingrédient')}
                   placeholderTextColor={colors.muted}
                   style={styles.addInput}
                   onSubmitEditing={addIngredient}
                   returnKeyType="done"
                 />
-                <Pressable onPress={addIngredient} style={styles.addBtn} accessibilityLabel="Ajouter">
+                <Pressable onPress={addIngredient} style={styles.addBtn} accessibilityLabel={t('Ajouter')}>
                   <Ionicons name="add" size={20} color={colors.onDark} />
                 </Pressable>
               </View>
@@ -456,32 +476,31 @@ function ReviewStep({
                 >
                   {scanning ? <ActivityIndicator color={colors.forest} /> : <Ionicons name="scan-outline" size={20} color={colors.forest} />}
                   <View style={{ flex: 1 }}>
-                    <Text style={[type.bodyStrong, { color: colors.forest }]}>{scanning ? 'Lecture en cours…' : 'Scanner une étiquette ou une recette'}</Text>
-                    <Text style={type.caption}>L'IA lit la liste d'ingrédients et les mentions « Contient » / « Peut contenir ».</Text>
+                    <Text style={[type.bodyStrong, { color: colors.forest }]}>{scanning ? t('Lecture en cours…') : t('Scanner une étiquette ou une recette')}</Text>
+                    <Text style={type.caption}>{t('L\'IA lit la liste d\'ingrédients et les mentions « Contient » / « Peut contenir ».')}</Text>
                   </View>
                 </Pressable>
               )}
             </View>
           </Section>
 
-          <Section title="Allergènes déclarés" hint="Calculés à partir des ingrédients. Le point jaune = suggéré par l'IA.">
+          <Section title={t('Allergènes déclarés')} hint={t('Calculés à partir des ingrédients. Le point jaune = suggéré par l\'IA.')}>
             <AllergenPicker selected={allergens} onToggle={toggleDeclared} highlight={[...aiConfidence.keys()]} />
             {[...aiConfidence.entries()]
               .filter(([code, conf]) => conf < LOW_CONFIDENCE && allergens.includes(code))
               .map(([code]) => (
                 <Text key={code} style={[type.caption, { color: colors.warning }]}>
-                  ⚠︎ {allergenById(code).fr} : suggestion à faible confiance, conservée par précaution. Retirez-la seulement si vous êtes certain.
-                </Text>
+                  ⚠︎ {tr(allergenById(code))}{' '}{t(': suggestion à faible confiance, conservée par précaution. Retirez-la seulement si vous êtes certain.')}</Text>
               ))}
           </Section>
 
-          <Section title="Peut contenir des traces de" hint="Contamination croisée possible dans votre cuisine (ex. vous cuisinez souvent avec des noix).">
+          <Section title={t('Peut contenir des traces de')} hint={t('Contamination croisée possible dans votre cuisine (ex. vous cuisinez souvent avec des noix).')}>
             <View style={styles.wrap}>
               {ALLERGENS.filter((a) => !allergens.includes(a.id)).map((a) => (
                 <Chip
                   key={a.id}
                   emoji={a.emoji}
-                  label={a.fr}
+                  label={tr(a)}
                   selected={mayContain.includes(a.id)}
                   onPress={() => setMayContain((m) => (m.includes(a.id) ? m.filter((x) => x !== a.id) : [...m, a.id]))}
                 />
@@ -489,15 +508,15 @@ function ReviewStep({
             </View>
           </Section>
 
-          <Section title="Régimes">
+          <Section title={t('Régimes')}>
             <View style={styles.wrap}>
               {DIETS.map((d) => (
-                <Chip key={d.id} label={d.fr} selected={diets.includes(d.id)} onPress={() => setDiets((l) => (l.includes(d.id) ? l.filter((x) => x !== d.id) : [...l, d.id]))} />
+                <Chip key={d.id} label={tr(d)} selected={diets.includes(d.id)} onPress={() => setDiets((l) => (l.includes(d.id) ? l.filter((x) => x !== d.id) : [...l, d.id]))} />
               ))}
             </View>
           </Section>
 
-          <Section title="Mode">
+          <Section title={t('Mode')}>
             <View style={styles.wrap}>
               {(
                 [
@@ -508,33 +527,41 @@ function ReviewStep({
               )
                 .filter(([id]) => SALES_ENABLED || id === 'swap')
                 .map(([id, label, icon]) => (
-                  <Chip key={id} icon={icon} label={label} selected={mode === id} onPress={() => setMode(id)} />
+                  <Chip key={id} icon={icon} label={t(label)} selected={mode === id} onPress={() => setMode(id)} />
                 ))}
             </View>
-            {!SALES_ENABLED && <Text style={type.caption}>Pendant la bêta, les plats s'échangent entre voisins. La vente sera activée ensuite.</Text>}
+            {!SALES_ENABLED && <Text style={type.caption}>{t('Pendant la bêta, les plats s\'échangent entre voisins. La vente sera activée ensuite.')}</Text>}
             {mode !== 'swap' && (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
                 <View style={{ flex: 1 }}>
-                  <TextField label="Prix par portion ($ CA)" value={price} onChangeText={setPrice} keyboardType="decimal-pad" icon="pricetag-outline" />
+                  <TextField label={t('Prix par portion ($ CA)')} value={price} onChangeText={setPrice} keyboardType="decimal-pad" icon="pricetag-outline" />
                 </View>
+              </View>
+            )}
+            {mode !== 'swap' && (
+              <View style={{ gap: spacing.sm }}>
+                <View style={styles.wrap}>
+                  {QUICK_PRICES.map((p) => (
+                    <Chip key={p} label={formatPrice(p * 100)} selected={price.replace(',', '.') === String(p)} onPress={() => setPrice(String(p))} />
+                  ))}
+                </View>
+                <Text style={type.caption}>{t('Pour démarrer, 4 à 6 $ la portion : un prix de voisin, qui couvre les ingrédients et attire vos premiers Eaters.')}</Text>
               </View>
             )}
           </Section>
 
-          <Section title="Disponibilité">
-            <Stepper label="Portions" value={portions} onChange={setPortions} min={1} max={20} />
-            <Stepper label="Disponible pendant" value={hours} onChange={setHours} min={2} max={72} step={2} suffix=" h" />
+          <Section title={t('Disponibilité')}>
+            <Stepper label={t('Portions')} value={portions} onChange={setPortions} min={1} max={20} />
+            <Stepper label={t('Disponible pendant')} value={hours} onChange={setHours} min={2} max={72} step={2} suffix=" h" />
           </Section>
 
-          <Section title="Lieu de cueillette">
+          <Section title={t('Lieu de cueillette')}>
             <PickupPicker value={pickup} onChange={setPickup} area={pickupArea} onAreaChange={setPickupArea} onConfirmed={() => setPickupConfirmed(true)} />
           </Section>
 
           <Pressable onPress={() => setAttested(!attested)} style={[styles.attest, attested && { borderColor: colors.forest, backgroundColor: colors.sage }]}>
             <Ionicons name={attested ? 'checkbox' : 'square-outline'} size={24} color={attested ? colors.forest : colors.muted} />
-            <Text style={[type.body, { flex: 1, color: colors.ink }]}>
-              J'ai vérifié la liste des ingrédients et des allergènes. Elle est complète et exacte, et je respecte les règles d'hygiène Homemade.
-            </Text>
+            <Text style={[type.body, { flex: 1, color: colors.ink }]}>{t('J\'ai vérifié la liste des ingrédients et des allergènes. Elle est complète et exacte, et je respecte les règles d\'hygiène Homemade.')}</Text>
           </Pressable>
         </View>
       </ScrollView>
@@ -548,7 +575,7 @@ function ReviewStep({
         }}
       />
       <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
-        <Button title="Publier le plat" variant="accent" icon="checkmark-circle" onPress={submit} loading={publishing} disabled={!attested} />
+        <Button title={t('Publier le plat')} variant="accent" icon="checkmark-circle" onPress={submit} loading={publishing} disabled={!attested} />
       </View>
     </KeyboardAvoidingView>
   );
@@ -563,52 +590,80 @@ function ScanSheet({
 }: {
   scan: AiTextScan | null;
   onClose: () => void;
-  onApply: (s: AiTextScan) => void;
+  onApply: (s: AiTextScan, likely: NonNullable<AiTextScan['likelyIngredients']>) => void;
   onRetry: () => void;
 }) {
   const insets = useSafeAreaInsets();
   const [showText, setShowText] = useState(false);
+  // Ingrédients probables du plat (absents du texte) : cochés par défaut, le Cooker décoche ceux qu'il n'a pas mis.
+  const [skipped, setSkipped] = useState<string[]>([]);
+  useEffect(() => setSkipped([]), [scan]);
   if (!scan) return null;
-  const empty = scan.source === 'none' || (ingredientsFromScan(scan).length === 0 && scan.contains.length === 0 && scan.mayContain.length === 0);
+  const likely = scan.source === 'label' ? [] : (scan.likelyIngredients ?? []);
+  const empty = scan.source === 'none' || (ingredientsFromScan(scan).length === 0 && likely.length === 0 && scan.contains.length === 0 && scan.mayContain.length === 0);
   const toAdd = ingredientsFromScan(scan);
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Fermer" />
+      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel={t('Fermer')} />
       <View style={[styles.sheet, { paddingBottom: insets.bottom + spacing.lg }]}>
         <ScrollView contentContainerStyle={{ gap: spacing.lg }}>
           <View style={{ gap: 4 }}>
-            <Text style={type.label}>{scan.source === 'label' ? 'Étiquette lue' : scan.source === 'recipe' ? 'Recette lue' : 'Texte lu'}</Text>
-            <Text style={type.h2}>{empty ? 'Aucun texte exploitable' : scan.title || 'Voici ce que l’IA a lu'}</Text>
+            <Text style={type.label}>{scan.source === 'label' ? t('Étiquette lue') : scan.source === 'recipe' ? t('Recette lue') : t('Texte lu')}</Text>
+            <Text style={type.h2}>{empty ? t('Aucun texte exploitable') : scan.title || t('Voici ce que l’IA a lu')}</Text>
           </View>
           {empty ? (
-            <Text style={type.body}>Photographiez la liste d'ingrédients de près, bien à plat et sans reflet.</Text>
+            <Text style={type.body}>{t('Photographiez la liste d\'ingrédients de près, bien à plat et sans reflet.')}</Text>
           ) : (
             <>
               <View style={{ gap: spacing.sm }}>
-                <Text style={type.h3}>{scan.source === 'label' ? 'Ingrédient ajouté' : `Ingrédients ajoutés · ${toAdd.length}`}</Text>
+                <Text style={type.h3}>{scan.source === 'label' ? t('Ingrédient ajouté') : t('Ingrédients ajoutés · {0}', { 0: toAdd.length })}</Text>
                 {toAdd.map((i) => (
                   <Text key={i.name} style={type.body}>
                     • {i.name}
-                    {i.allergens.length ? `  —  ${i.allergens.map((a) => allergenById(a).fr).join(', ')}` : ''}
+                    {i.allergens.length ? `  —  ${i.allergens.map((a) => tr(allergenById(a))).join(', ')}` : ''}
                   </Text>
                 ))}
               </View>
+              {likely.length > 0 && (
+                <View style={{ gap: spacing.sm }}>
+                  <Text style={type.h3}>{t('Ingrédients habituels de ce plat')}</Text>
+                  <Text style={type.caption}>{t('Absents du texte, mais présents dans la plupart des recettes. Décochez ceux que vous n\'avez pas mis.')}</Text>
+                  {likely.map((i) => {
+                    const on = !skipped.includes(i.name);
+                    return (
+                      <Pressable
+                        key={i.name}
+                        onPress={() => setSkipped((l) => (on ? [...l, i.name] : l.filter((n) => n !== i.name)))}
+                        style={styles.likelyRow}
+                        accessibilityRole="checkbox"
+                        accessibilityState={{ checked: on }}
+                      >
+                        <Ionicons name={on ? 'checkbox' : 'square-outline'} size={22} color={on ? colors.forest : colors.muted} />
+                        <Text style={[type.body, { flex: 1 }]}>
+                          {i.name}
+                          {i.allergens.length ? `  —  ${i.allergens.map((a) => tr(allergenById(a))).join(', ')}` : ''}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              )}
               {scan.contains.length > 0 && (
                 <View style={{ gap: spacing.sm }}>
-                  <Text style={type.h3}>Contient</Text>
+                  <Text style={type.h3}>{t('Contient')}</Text>
                   <View style={styles.wrap}>
                     {scan.contains.map((a) => (
-                      <Badge key={a} label={`${allergenById(a).emoji} ${allergenById(a).fr}`} tone="danger" />
+                      <Badge key={a} label={`${allergenById(a).emoji} ${tr(allergenById(a))}`} tone="danger" />
                     ))}
                   </View>
                 </View>
               )}
               {scan.mayContain.length > 0 && (
                 <View style={{ gap: spacing.sm }}>
-                  <Text style={type.h3}>Peut contenir (traces)</Text>
+                  <Text style={type.h3}>{t('Peut contenir (traces)')}</Text>
                   <View style={styles.wrap}>
                     {scan.mayContain.map((a) => (
-                      <Badge key={a} label={`${allergenById(a).emoji} ${allergenById(a).fr}`} tone="saffron" />
+                      <Badge key={a} label={`${allergenById(a).emoji} ${tr(allergenById(a))}`} tone="saffron" />
                     ))}
                   </View>
                 </View>
@@ -621,22 +676,22 @@ function ScanSheet({
               {!!scan.text && (
                 <Pressable onPress={() => setShowText(!showText)} style={styles.transcript}>
                   <Text style={[type.caption, { color: colors.forest, fontFamily: fonts.semibold }]}>
-                    {showText ? 'Masquer le texte lu' : 'Comparer avec le texte lu'}
+                    {showText ? t('Masquer le texte lu') : t('Comparer avec le texte lu')}
                   </Text>
                   {showText && <Text style={[type.caption, { color: colors.inkSoft, marginTop: spacing.sm }]}>{scan.text}</Text>}
                 </Pressable>
               )}
-              <Text style={type.caption}>Les allergènes lus s'ajoutent à votre annonce ; rien n'est retiré. Vous pourrez tout revoir avant de publier.</Text>
+              <Text style={type.caption}>{t('Les allergènes lus s\'ajoutent à votre annonce ; rien n\'est retiré. Vous pourrez tout revoir avant de publier.')}</Text>
             </>
           )}
         </ScrollView>
         <View style={{ gap: spacing.sm, marginTop: spacing.lg }}>
           {empty ? (
-            <Button title="Réessayer" icon="scan-outline" onPress={onRetry} />
+            <Button title={t('Réessayer')} icon="scan-outline" onPress={onRetry} />
           ) : (
-            <Button title="Ajouter à mon annonce" icon="add-circle-outline" onPress={() => onApply(scan)} />
+            <Button title={t('Ajouter à mon annonce')} icon="add-circle-outline" onPress={() => onApply(scan, likely.filter((i) => !skipped.includes(i.name)))} />
           )}
-          <Button title="Annuler" variant="ghost" onPress={onClose} />
+          <Button title={t('Annuler')} variant="ghost" onPress={onClose} />
         </View>
       </View>
     </Modal>
@@ -659,14 +714,14 @@ function Stepper({ label, value, onChange, min, max, step = 1, suffix = '' }: { 
   return (
     <View style={styles.stepper}>
       <Text style={[type.bodyStrong, { flex: 1 }]}>{label}</Text>
-      <Pressable style={styles.stepBtn} onPress={() => onChange(Math.max(min, value - step))} accessibilityLabel="Diminuer">
+      <Pressable style={styles.stepBtn} onPress={() => onChange(Math.max(min, value - step))} accessibilityLabel={t('Diminuer')}>
         <Ionicons name="remove" size={18} color={colors.ink} />
       </Pressable>
       <Text style={[type.h3, { minWidth: 48, textAlign: 'center' }]}>
         {value}
         {suffix}
       </Text>
-      <Pressable style={styles.stepBtn} onPress={() => onChange(Math.min(max, value + step))} accessibilityLabel="Augmenter">
+      <Pressable style={styles.stepBtn} onPress={() => onChange(Math.min(max, value + step))} accessibilityLabel={t('Augmenter')}>
         <Ionicons name="add" size={18} color={colors.ink} />
       </Pressable>
     </View>
@@ -680,19 +735,18 @@ function DoneStep({ onAgain }: { onAgain: () => void }) {
       <View style={styles.doneIcon}>
         <Ionicons name="checkmark" size={44} color={colors.onDark} />
       </View>
-      <Text style={[type.h1, { textAlign: 'center' }]}>Votre plat est en ligne !</Text>
-      <Text style={[type.body, { textAlign: 'center' }]}>
-        Il apparaît maintenant sur la carte et dans le fil des voisins compatibles avec ses allergènes. Les demandes arrivent dans l'onglet Messages.
-      </Text>
+      <Text style={[type.h1, { textAlign: 'center' }]}>{t('Votre plat est en ligne !')}</Text>
+      <Text style={[type.body, { textAlign: 'center' }]}>{t('Il apparaît maintenant sur la carte et dans le fil des voisins compatibles avec ses allergènes. Les demandes arrivent dans l\'onglet Messages.')}</Text>
       <View style={{ alignSelf: 'stretch', gap: spacing.md, marginTop: spacing.lg }}>
-        <Button title="Voir mes plats" onPress={() => router.push('/my-meals')} />
-        <Button title="Publier un autre plat" variant="secondary" onPress={onAgain} />
+        <Button title={t('Voir mes plats')} onPress={() => router.push('/my-meals')} />
+        <Button title={t('Publier un autre plat')} variant="secondary" onPress={onAgain} />
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  likelyRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 44 },
   captureCard: { height: 240, borderRadius: radius.xl, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', gap: spacing.md, ...shadow.floating },
   captureIcon: { width: 76, height: 76, borderRadius: 38, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
   tips: { backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.lg, gap: spacing.md, borderWidth: 1, borderColor: colors.border },

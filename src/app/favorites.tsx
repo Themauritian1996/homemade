@@ -10,6 +10,7 @@ import { useApp } from '@/store/app';
 import { colors, radius, spacing, type } from '@/theme';
 import type { Meal } from '@/types';
 
+import { t } from '@/i18n';
 export default function Favorites() {
   const insets = useSafeAreaInsets();
   const favorites = useApp((s) => s.favorites);
@@ -33,7 +34,7 @@ export default function Favorites() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <ScreenHeader title="Mes favoris" />
+      <ScreenHeader title={t('Mes favoris')} />
       <FlatList
         data={items}
         keyExtractor={(i) => i.id}
@@ -41,8 +42,8 @@ export default function Favorites() {
         contentContainerStyle={{ padding: spacing.xl, paddingTop: spacing.sm, gap: spacing.md, paddingBottom: insets.bottom + spacing.huge }}
         ListEmptyComponent={
           loading ? null : (
-            <EmptyState icon="heart-outline" title="Aucun favori" body="Touchez ♡ sur un plat pour le retrouver ici.">
-              <Button title="Découvrir les plats" onPress={() => router.push('/')} style={{ marginTop: spacing.md }} />
+            <EmptyState icon="heart-outline" title={t('Aucun favori')} body={t('Touchez ♡ sur un plat pour le retrouver ici.')}>
+              <Button title={t('Découvrir les plats')} onPress={() => router.push('/')} style={{ marginTop: spacing.md }} />
             </EmptyState>
           )
         }
@@ -54,12 +55,11 @@ export default function Favorites() {
                 <MealCard meal={item.meal} variant="compact" />
               ) : (
                 <View style={styles.gone}>
-                  <Text style={type.body}>Plat retiré par son Cooker</Text>
+                  <Text style={type.body}>{t('Plat retiré par son Cooker')}</Text>
                 </View>
               )}
               {!available && (
-                <Text style={[type.caption, { color: colors.warning }]} onPress={() => toggleFavorite(item.id)}>
-                  Plus disponible · <Text style={{ textDecorationLine: 'underline' }}>retirer des favoris</Text>
+                <Text style={[type.caption, { color: colors.warning }]} onPress={() => toggleFavorite(item.id)}>{t('Plus disponible ·')}{' '}<Text style={{ textDecorationLine: 'underline' }}>{t('retirer des favoris')}</Text>
                 </Text>
               )}
             </View>

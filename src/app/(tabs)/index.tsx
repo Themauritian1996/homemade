@@ -7,7 +7,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FilterSheet } from '@/components/FilterSheet';
 import { MealCard } from '@/components/MealCard';
 import { Button, Chip, EmptyState, IconButton, SectionHeader } from '@/components/ui';
-import { allergenById, CUISINES, cuisineById } from '@/data/allergens';
+import { CUISINES, cuisineById } from '@/data/allergens';
+import { t, tr } from '@/i18n';
 import { useFeed } from '@/lib/useFeed';
 import { activeFilterCount, useApp } from '@/store/app';
 import { colors, fonts, radius, shadow, spacing, type } from '@/theme';
@@ -19,11 +20,15 @@ const normalize = (s: string) =>
     .replace(/[\u0300-\u036f]/g, '')
     .trim();
 
+/** Catégories mises en avant d'abord (repas de la semaine, santé), puis les cuisines du monde. */
+const FEATURED_FIRST = ['meal_prep', 'healthy_bowl', 'breakfast'];
+const FEATURED_CUISINES = [...CUISINES.filter((c) => FEATURED_FIRST.includes(c.id)), ...CUISINES.filter((c) => !FEATURED_FIRST.includes(c.id) && c.id !== 'other')];
+
 function greeting() {
   const h = new Date().getHours();
-  if (h < 11) return 'Bon matin';
-  if (h < 17) return 'Bon après-midi';
-  return 'Bonsoir';
+  if (h < 11) return t('Bon matin');
+  if (h < 17) return t('Bon après-midi');
+  return t('Bonsoir');
 }
 
 export default function Discover() {
@@ -40,7 +45,7 @@ export default function Discover() {
     if (!q) return all;
     return all.filter((m) =>
       normalize(
-        [m.title, m.description, cuisineById(m.cuisine).fr, m.pickupArea, m.cooker.displayName, ...m.ingredients.map((i) => i.name)].join(' '),
+        [m.title, m.description, cuisineById(m.cuisine).fr, cuisineById(m.cuisine).en, m.pickupArea, m.cooker.displayName, ...m.ingredients.map((i) => i.name)].join(' '),
       ).includes(q),
     );
   }, [all, query]);
@@ -65,11 +70,11 @@ export default function Discover() {
           <Text style={type.caption}>
             {greeting()}, {user?.displayName ?? ''} 👋
           </Text>
-          <Text style={type.h1}>Qu'est-ce qu'on mange ?</Text>
+          <Text style={type.h1}>{t('Qu\'est-ce qu\'on mange ?')}</Text>
         </View>
         <IconButton
           icon="chatbubbles-outline"
-          accessibilityLabel={unread ? `${unread} message(s) non lu(s)` : 'Messages'}
+          accessibilityLabel={unread ? t('{0} message(s) non lu(s)', { 0: unread }) : t('Messages')}
           badge={unread}
           onPress={() => router.push('/inbox')}
         />
@@ -80,18 +85,18 @@ export default function Discover() {
         <TextInput
           value={query}
           onChangeText={setQuery}
-          placeholder="Plats, ingrédients, quartiers…"
+          placeholder={t('Plats, ingrédients, quartiers…')}
           placeholderTextColor={colors.muted}
           style={styles.searchInput}
           returnKeyType="search"
-          accessibilityLabel="Rechercher un plat"
+          accessibilityLabel={t('Rechercher un plat')}
         />
         {!!query && (
-          <Pressable onPress={() => setQuery('')} hitSlop={8} accessibilityLabel="Effacer la recherche">
+          <Pressable onPress={() => setQuery('')} hitSlop={8} accessibilityLabel={t('Effacer la recherche')}>
             <Ionicons name="close-circle" size={18} color={colors.muted} />
           </Pressable>
         )}
-        <Pressable style={styles.filterBtn} onPress={() => setSheet(true)} accessibilityRole="button" accessibilityLabel="Filtres">
+        <Pressable style={styles.filterBtn} onPress={() => setSheet(true)} accessibilityRole="button" accessibilityLabel={t('Filtres')}>
           <Ionicons name="options-outline" size={18} color={colors.onDark} />
           {count > 0 && <Text style={styles.filterCount}>{count}</Text>}
         </Pressable>
@@ -100,45 +105,48 @@ export default function Discover() {
       {!hasRealLocation && (
         <Pressable style={styles.locationHint} onPress={locate} accessibilityRole="button">
           <Ionicons name="navigate-outline" size={18} color={colors.tomato} />
-          <Text style={[type.caption, { flex: 1, color: colors.ink }]}>
-            Les plats sont affichés autour de Montréal. Touchez ici pour utiliser votre position.
-          </Text>
+          <Text style={[type.caption, { flex: 1, color: colors.ink }]}>{t('Les plats sont affichés autour de Montréal. Touchez ici pour utiliser votre position.')}</Text>
         </Pressable>
       )}
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.sm, paddingRight: spacing.xl }} style={{ marginHorizontal: -spacing.xl, paddingLeft: spacing.xl }}>
-        <Chip label="Tout" selected={filters.cuisines.length === 0} onPress={() => setFilters({ cuisines: [] })} />
-        {CUISINES.slice(0, 10).map((c) => (
+        <Chip label={t('Tout')} selected={filters.cuisines.length === 0} onPress={() => setFilters({ cuisines: [] })} />
+        {FEATURED_CUISINES.map((c) => (
           <Chip
             key={c.id}
             emoji={c.emoji}
-            label={c.fr}
+            label={tr(c)}
             selected={filters.cuisines.includes(c.id)}
             onPress={() => setFilters({ cuisines: filters.cuisines.includes(c.id) ? filters.cuisines.filter((x) => x !== c.id) : [c.id] })}
           />
         ))}
       </ScrollView>
 
-      <Pressable style={styles.shield} onPress={() => router.push('/health')}>
-        <View style={styles.shieldIcon}>
-          <Ionicons name="shield-checkmark" size={18} color={colors.forest} />
+      {!query && (
+        <View style={styles.community}>
+          <View style={{ flex: 1, gap: 4 }}>
+            <Text style={[type.h3, { color: colors.onDark }]}>{t('La table du quartier 🍲')}</Text>
+            <Text style={[type.caption, { color: 'rgba(255,255,255,0.85)' }]}>{t('Des voisins qui aiment cuisiner partagent leurs plats et leurs meal preps. Chaque portion partagée, c\'est un repas sauvé du gaspillage.')}</Text>
+          </View>
+          <Pressable style={styles.communityBtn} onPress={() => router.push('/publish')} accessibilityRole="button" accessibilityLabel={t('Partager un plat')}>
+            <Ionicons name="add" size={22} color={colors.forest} />
+          </Pressable>
         </View>
-        <View style={{ flex: 1 }}>
-          <Text style={[type.bodyStrong, { color: colors.forest }]}>
-            {health.allergens.length
-              ? `Filtre santé actif · ${health.allergens.map((a) => allergenById(a.code).fr).join(', ')}`
-              : 'Configurez votre profil santé'}
+      )}
+
+      {/* Préférences alimentaires : appliquées par le serveur ; on reste transparent sur les plats masqués, sans en faire le sujet. */}
+      {(health.allergens.length > 0 || health.diets.length > 0) && (
+        <Pressable style={styles.prefs} onPress={() => router.push('/health')} accessibilityRole="button">
+          <Ionicons name="shield-checkmark-outline" size={14} color={colors.forestSoft} />
+          <Text style={[type.caption, { flex: 1, color: colors.forestSoft }]} numberOfLines={1}>{t('Vos préférences alimentaires sont appliquées')}{hiddenForHealth > 0 ? t(' · {0} plat(s) masqué(s)', { 0: hiddenForHealth }) : ''}
           </Text>
-          <Text style={[type.caption, { color: colors.forestSoft }]}>
-            {hiddenForHealth > 0 ? `${hiddenForHealth} plat(s) masqué(s) pour votre sécurité` : 'Les plats à risque sont retirés automatiquement'}
-          </Text>
-        </View>
-        <Ionicons name="chevron-forward" size={18} color={colors.forest} />
-      </Pressable>
+          <Ionicons name="chevron-forward" size={14} color={colors.forestSoft} />
+        </Pressable>
+      )}
 
       {endingSoon.length > 1 && !query && (
         <View>
-          <SectionHeader title="Bientôt terminés ⏳" />
+          <SectionHeader title={t('Bientôt terminés ⏳')} />
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.md, paddingRight: spacing.xl }} style={{ marginHorizontal: -spacing.xl, paddingLeft: spacing.xl }}>
             {endingSoon.map((m) => (
               <View key={m.id} style={{ width: 280 }}>
@@ -150,8 +158,8 @@ export default function Discover() {
       )}
 
       <SectionHeader
-        title={query ? `Résultats · ${meals.length}` : `Près de vous · ${meals.length}`}
-        action="Voir la carte"
+        title={query ? t('Résultats · {0}', { 0: meals.length }) : t('Près de vous · {0}', { 0: meals.length })}
+        action={t('Voir la carte')}
         onAction={() => router.push('/map')}
       />
     </View>
@@ -171,18 +179,18 @@ export default function Discover() {
           loading ? null : query ? (
             <EmptyState
               icon="search-outline"
-              title="Aucun résultat"
-              body={`Aucun plat ne correspond à « ${query} » dans un rayon de ${filters.radiusKm} km.`}
+              title={t('Aucun résultat')}
+              body={t('Aucun plat ne correspond à « {0} » dans un rayon de {1} km.', { 0: query, 1: filters.radiusKm })}
             />
           ) : (
             <EmptyState
-              icon="leaf-outline"
-              title="Aucun plat pour l'instant"
-              body="Élargissez la distance ou retirez quelques filtres. Et pourquoi ne pas cuisiner pour vos voisins ?"
+              icon="restaurant-outline"
+              title={t('La table est encore vide ici')}
+              body={t('Soyez le premier à partager un plat ou votre meal prep, ou invitez vos voisins qui aiment cuisiner. Vous pouvez aussi élargir la distance.')}
             >
               <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md }}>
-                <Button title="Publier un plat" size="md" variant="accent" icon="camera" onPress={() => router.push('/publish')} />
-                <Button title="Inviter" size="md" variant="secondary" icon="gift-outline" onPress={() => router.push('/invite')} />
+                <Button title={t('Publier un plat')} size="md" variant="accent" icon="camera" onPress={() => router.push('/publish')} />
+                <Button title={t('Inviter')} size="md" variant="secondary" icon="gift-outline" onPress={() => router.push('/invite')} />
               </View>
             </EmptyState>
           )
@@ -226,6 +234,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   filterCount: { color: colors.onDark, fontFamily: fonts.bold, fontSize: 12 },
-  shield: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.sage, padding: spacing.md, borderRadius: radius.lg },
-  shieldIcon: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
+  community: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.forest, padding: spacing.lg, borderRadius: radius.lg, ...shadow.card },
+  communityBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
+  prefs: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: -spacing.sm, minHeight: 32 },
 });

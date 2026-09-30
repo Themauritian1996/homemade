@@ -2,7 +2,9 @@ import { router } from 'expo-router';
 import React from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { t } from '@/i18n';
 import { colors, spacing, type } from '@/theme';
+import { LanguageToggle } from './LanguageToggle';
 import { IconButton, Logo } from './ui';
 
 export function AuthScaffold({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
@@ -14,10 +16,11 @@ export function AuthScaffold({ title, subtitle, children }: { title: string; sub
         keyboardShouldPersistTaps="handled"
       >
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <IconButton icon="chevron-back" onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} accessibilityLabel="Retour" />
-          <Logo size={28} />
+          <IconButton icon="chevron-back" onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} accessibilityLabel={t('Retour')} />
+          <LanguageToggle />
         </View>
         <View style={{ marginTop: spacing.xxl, marginBottom: spacing.xxl, gap: spacing.sm }}>
+          <Logo size={28} />
           <Text style={type.h1}>{title}</Text>
           <Text style={type.body}>{subtitle}</Text>
         </View>

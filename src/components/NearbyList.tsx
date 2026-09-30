@@ -13,6 +13,7 @@ import { FilterSheet } from './FilterSheet';
 import { MealCard } from './MealCard';
 import { Chip, EmptyState } from './ui';
 
+import { t } from '@/i18n';
 export function NearbyList({ notice, onShowMap }: { notice?: string; onShowMap?: () => void }) {
   const insets = useSafeAreaInsets();
   const { meals, loading, reload } = useFeed();
@@ -32,17 +33,16 @@ export function NearbyList({ notice, onShowMap }: { notice?: string; onShowMap?:
           <View style={{ gap: spacing.md, marginBottom: spacing.sm }}>
             <View style={styles.row}>
               <View style={{ flex: 1 }}>
-                <Text style={type.h1}>Autour de vous</Text>
+                <Text style={type.h1}>{t('Autour de vous')}</Text>
                 <Text style={type.caption}>
-                  {meals.length} repas dans un rayon de {filters.radiusKm} km · du plus proche au plus loin
-                </Text>
+                  {meals.length}{' '}{t('repas dans un rayon de')}{' '}{filters.radiusKm}{' '}{t('km · du plus proche au plus loin')}</Text>
               </View>
               {onShowMap && (
-                <Pressable style={styles.roundBtn} onPress={onShowMap} accessibilityRole="button" accessibilityLabel="Afficher la carte">
+                <Pressable style={styles.roundBtn} onPress={onShowMap} accessibilityRole="button" accessibilityLabel={t('Afficher la carte')}>
                   <Ionicons name="map-outline" size={20} color={colors.ink} />
                 </Pressable>
               )}
-              <Pressable style={styles.roundBtn} onPress={() => setSheet(true)} accessibilityLabel="Filtres">
+              <Pressable style={styles.roundBtn} onPress={() => setSheet(true)} accessibilityLabel={t('Filtres')}>
                 <Ionicons name="options-outline" size={20} color={colors.ink} />
                 {activeFilterCount(filters) > 0 && <View style={styles.dot} />}
               </Pressable>
@@ -55,7 +55,7 @@ export function NearbyList({ notice, onShowMap }: { notice?: string; onShowMap?:
                   ['swap', 'Échange'],
                 ] as const
               ).map(([id, label]) => (
-                <Chip key={id} label={label} selected={filters.mode === id} onPress={() => setFilters({ mode: id })} />
+                <Chip key={id} label={t(label)} selected={filters.mode === id} onPress={() => setFilters({ mode: id })} />
               ))}
             </View>
             {notice && (
@@ -69,7 +69,7 @@ export function NearbyList({ notice, onShowMap }: { notice?: string; onShowMap?:
         renderItem={({ item }) => <MealCard meal={item} variant="compact" />}
         ListEmptyComponent={
           loading ? null : (
-            <EmptyState icon="location-outline" title="Aucun plat à proximité" body="Élargissez le rayon dans les filtres, ou revenez un peu plus tard." />
+            <EmptyState icon="location-outline" title={t('Aucun plat à proximité')} body={t('Élargissez le rayon dans les filtres, ou revenez un peu plus tard.')} />
           )
         }
       />

@@ -66,6 +66,8 @@ export type CuisineCode =
   | 'caribbean'
   | 'mediterranean'
   | 'healthy_bowl'
+  | 'meal_prep'
+  | 'breakfast'
   | 'dessert'
   | 'other';
 
@@ -80,6 +82,8 @@ export const CUISINES: { id: CuisineCode; fr: string; en: string; emoji: string 
   { id: 'caribbean', fr: 'Caribéen', en: 'Caribbean', emoji: '🌴' },
   { id: 'mediterranean', fr: 'Méditerranéen', en: 'Mediterranean', emoji: '🫒' },
   { id: 'healthy_bowl', fr: 'Bol santé', en: 'Healthy bowl', emoji: '🥗' },
+  { id: 'meal_prep', fr: 'Meal prep', en: 'Meal prep', emoji: '🍱' },
+  { id: 'breakfast', fr: 'Déjeuner & brunch', en: 'Breakfast & brunch', emoji: '🥞' },
   { id: 'dessert', fr: 'Dessert', en: 'Dessert', emoji: '🍰' },
   { id: 'other', fr: 'Autre', en: 'Other', emoji: '🍽️' },
 ];

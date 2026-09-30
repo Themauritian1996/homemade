@@ -11,6 +11,6 @@ Rappels essentiels :
 - L'IA propose, le Cooker atteste, le serveur publie (`publish_meal`). Fail-closed partout.
 - Aucun secret dans l'app ; écritures critiques via RPC uniquement.
 - Référentiels à garder synchronisés : `supabase/seed.sql` ⇄ `src/data/allergens.ts` ⇄ `supabase/functions/analyze-meal/prompt.ts`.
-- UI en français québécois ; styles depuis `src/theme`, composants depuis `src/components/ui.tsx`.
+- UI en français québécois, bilingue : tout texte affiché passe par `t('texte français')` de `src/i18n` (traduction dans `src/i18n/en.ts`) ; styles depuis `src/theme`, composants depuis `src/components/ui.tsx`.
 
-Vérifier avant de terminer : `npm run typecheck` et `npm run test:db`.
+Vérifier avant de terminer : `npm run typecheck`, `npm run test:db` et `npm run test:i18n`.

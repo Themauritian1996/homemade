@@ -10,6 +10,7 @@ import { formatPrice, timeLeft } from '@/lib/format';
 import { fetchMyMeals, MyMeal, withdrawMeal } from '@/services/account';
 import { colors, radius, shadow, spacing, type } from '@/theme';
 
+import { t } from '@/i18n';
 const STATUS: Record<string, { label: string; tone: 'forest' | 'saffron' | 'danger' | 'neutral' }> = {
   published: { label: 'En ligne', tone: 'forest' },
   reserved: { label: 'Réservé', tone: 'saffron' },
@@ -28,26 +29,26 @@ export default function MyMeals() {
     setLoading(true);
     fetchMyMeals()
       .then(setMeals)
-      .catch((e) => Alert.alert('Chargement impossible', friendlyError(e)))
+      .catch((e) => Alert.alert(t('Chargement impossible'), friendlyError(e)))
       .finally(() => setLoading(false));
   }, []);
   useFocusEffect(load);
 
   const withdraw = (m: MyMeal) =>
     Alert.alert(
-      'Retirer cette annonce ?',
-      `« ${m.title} » n'apparaîtra plus dans le fil ni sur la carte. Les propositions d'échange en attente seront refusées.`,
+      t('Retirer cette annonce ?'),
+      t('« {0} » n\'apparaîtra plus dans le fil ni sur la carte. Les propositions d\'échange en attente seront refusées.', { 0: m.title }),
       [
-        { text: 'Annuler', style: 'cancel' },
+        { text: t('Annuler'), style: 'cancel' },
         {
-          text: 'Retirer',
+          text: t('Retirer'),
           style: 'destructive',
           onPress: async () => {
             try {
               await withdrawMeal(m.id);
               setMeals((l) => l.filter((x) => x.id !== m.id));
             } catch (e) {
-              Alert.alert('Retrait impossible', friendlyError(e));
+              Alert.alert(t('Retrait impossible'), friendlyError(e));
             }
           },
         },
@@ -56,7 +57,7 @@ export default function MyMeals() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <ScreenHeader title="Mes plats" subtitle="Vos annonces des 50 derniers plats" />
+      <ScreenHeader title={t('Mes plats')} subtitle={t('Vos annonces des 50 derniers plats')} />
       <FlatList
         data={meals}
         keyExtractor={(m) => m.id}
@@ -66,10 +67,10 @@ export default function MyMeals() {
           loading ? null : (
             <EmptyState
               icon="restaurant-outline"
-              title="Aucun plat publié"
-              body="Vous cuisinez trop ? Partagez une portion avec vos voisins : une photo suffit."
+              title={t('Aucun plat publié')}
+              body={t('Vous cuisinez trop ? Partagez une portion avec vos voisins : une photo suffit.')}
             >
-              <Button title="Publier un plat" variant="accent" icon="camera" onPress={() => router.push('/publish')} style={{ marginTop: spacing.md }} />
+              <Button title={t('Publier un plat')} variant="accent" icon="camera" onPress={() => router.push('/publish')} style={{ marginTop: spacing.md }} />
             </EmptyState>
           )
         }
@@ -85,19 +86,19 @@ export default function MyMeals() {
                     {m.title}
                   </Text>
                   <View style={{ flexDirection: 'row', gap: spacing.xs, flexWrap: 'wrap' }}>
-                    <Badge label={st.label} tone={st.tone} />
-                    {m.activeOrders > 0 && <Badge label={`${m.activeOrders} demande(s)`} tone="tomato" icon="chatbubbles-outline" />}
+                    <Badge label={t(st.label)} tone={st.tone} />
+                    {m.activeOrders > 0 && <Badge label={t('{0} demande(s)', { 0: m.activeOrders })} tone="tomato" icon="chatbubbles-outline" />}
                   </View>
                   <Text style={type.caption}>
-                    {formatPrice(m.priceCents)} · {m.portionsLeft}/{m.portionsTotal} portions{live ? ` · encore ${timeLeft(m.availableUntil)}` : ''}
+                    {formatPrice(m.priceCents)} · {m.portionsLeft}/{m.portionsTotal}{' '}{t('portions')}{live ? t(' · encore {0}', { 0: timeLeft(m.availableUntil) }) : ''}
                   </Text>
                 </View>
               </Pressable>
               <View style={{ flexDirection: 'row', gap: spacing.sm }}>
                 {m.activeOrders > 0 && (
-                  <Button title="Voir les demandes" size="md" icon="chatbubbles-outline" onPress={() => router.push('/inbox')} style={{ flex: 1 }} />
+                  <Button title={t('Voir les demandes')} size="md" icon="chatbubbles-outline" onPress={() => router.push('/inbox')} style={{ flex: 1 }} />
                 )}
-                <Button title="Retirer" size="md" variant="secondary" icon="eye-off-outline" onPress={() => withdraw(m)} style={{ flex: 1 }} />
+                <Button title={t('Retirer')} size="md" variant="secondary" icon="eye-off-outline" onPress={() => withdraw(m)} style={{ flex: 1 }} />
               </View>
             </View>
           );

@@ -7,6 +7,8 @@
 #   SUPABASE_ACCESS_TOKEN  jeton du compte qui possède le projet (supabase.com/dashboard/account/tokens)
 #   GEMINI_API_KEY         clé gratuite Google AI Studio (aistudio.google.com/apikey)
 #   GROQ_API_KEY           facultatif, secours gratuit (console.groq.com/keys)
+#   GMAIL_ADDRESS          facultatif : adresse Gmail qui envoie les codes (confirmation de compte, mot de passe oublié)
+#   GMAIL_APP_PASSWORD     facultatif : « mot de passe d'application » Google de cette adresse (myaccount.google.com/apppasswords)
 # Projet : homemade au Canada (lcpoxseqtabauemymlss) ; autre projet possible via la variable SUPABASE_PROJECT_REF.
 name: Serveur Supabase
 
@@ -44,6 +46,8 @@ jobs:
       AI_CUSTOM_URL: ${{ secrets.AI_CUSTOM_URL }}
       AI_CUSTOM_MODEL: ${{ secrets.AI_CUSTOM_MODEL }}
       AI_CUSTOM_KEY: ${{ secrets.AI_CUSTOM_KEY }}
+      GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
+      GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
 
@@ -64,7 +68,7 @@ jobs:
         if: ${{ !inputs.dry_run }}
         run: node scripts/supabase-deploy.mjs migrate
 
-      - name: Réglages d'inscription (bêta)
+      - name: Réglages d'inscription et courriels
         if: ${{ !inputs.dry_run }}
         run: node scripts/supabase-deploy.mjs auth
 

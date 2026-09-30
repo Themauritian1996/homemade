@@ -11,6 +11,7 @@
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import {
+  languageInstruction,
   LOCAL_OCR_OUTPUT_SCHEMA,
   LOCAL_OCR_SYSTEM_PROMPT,
   LOCAL_OUTPUT_SCHEMA,
@@ -20,6 +21,7 @@ import {
   sanitize,
   sanitizeOcr,
 } from '../../supabase/functions/analyze-meal/prompt';
+import { getLang } from '@/i18n';
 import { config } from '@/lib/config';
 import type { AiMealAnalysis, AiTextScan } from '@/types';
 
@@ -75,7 +77,7 @@ async function callLocalModel(system: string, schema: object, instruction: strin
 
 export async function analyzeWithLocalModel(base64Jpeg: string): Promise<AiMealAnalysis> {
   const raw = await callLocalModel(
-    LOCAL_SYSTEM_PROMPT,
+    LOCAL_SYSTEM_PROMPT + languageInstruction(getLang()),
     LOCAL_OUTPUT_SCHEMA,
     'Analyse ce plat pour pré-remplir son annonce. Réponds uniquement en JSON.',
     base64Jpeg,
@@ -86,7 +88,7 @@ export async function analyzeWithLocalModel(base64Jpeg: string): Promise<AiMealA
 
 export async function readTextWithLocalModel(base64Jpeg: string): Promise<AiTextScan> {
   const raw = await callLocalModel(
-    LOCAL_OCR_SYSTEM_PROMPT,
+    LOCAL_OCR_SYSTEM_PROMPT + languageInstruction(getLang()),
     LOCAL_OCR_OUTPUT_SCHEMA,
     'Lis le texte de cette photo. Réponds uniquement en JSON.',
     base64Jpeg,

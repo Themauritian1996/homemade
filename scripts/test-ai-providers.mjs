@@ -1,7 +1,7 @@
 // Teste la chaîne de fournisseurs d'IA gratuits (supabase/functions/analyze-meal/providers.ts) avec des réponses
 // simulées : aucun appel réseau, aucune clé nécessaire.  Lancer : node --experimental-strip-types scripts/test-ai-providers.mjs
 import { analyzeWithFreeProviders, configuredProviders, extractJson, toGeminiSchema } from '../supabase/functions/analyze-meal/providers.ts';
-import { OUTPUT_SCHEMA } from '../supabase/functions/analyze-meal/prompt.ts';
+import { languageInstruction, OCR_OUTPUT_SCHEMA, OUTPUT_SCHEMA, sanitizeOcr } from '../supabase/functions/analyze-meal/prompt.ts';
 
 let failures = 0;
 const check = (label, cond, extra = '') => {
@@ -93,6 +93,24 @@ try {
 }
 
 check('extractJson : texte autour du JSON', extractJson('Voici : {"a":1} merci') === '{"a":1}');
+
+// Lecture de recette : ingrédients probables du plat (absents du texte), proposés au Cooker
+const scan = sanitizeOcr(
+  {
+    source: 'recipe', text: 'Lasagne de maman : pâtes, sauce tomate, boeuf haché.', title: 'Lasagne de maman',
+    ingredients: [{ name: 'Pâtes', allergens: [] }, { name: 'Sauce tomate', allergens: [] }],
+    likely_ingredients: [{ name: 'Mozzarella', allergens: [], confidence: 0.8 }, { name: 'pâtes', allergens: [], confidence: 0.9 }, { name: 'Ricotta', allergens: ['milk'], confidence: 2 }],
+    contains: [], may_contain: [], confidence: 0.9, warnings: [],
+  },
+  'test',
+);
+check('OCR : ingrédients probables proposés', scan.likelyIngredients.map((i) => i.name).join() === 'Mozzarella,Ricotta', scan.likelyIngredients.map((i) => i.name).join());
+check('OCR : lexique appliqué aux ingrédients probables (mozzarella ⇒ lait)', scan.likelyIngredients[0].allergens.includes('milk'));
+check('OCR : confiance bornée à 1', scan.likelyIngredients[1].confidence === 1);
+check('OCR : ingrédients probables NON comptés comme « contient » tant que le Cooker ne les ajoute pas', !scan.contains.includes('milk'));
+check('OCR : ancien format sans likely_ingredients accepté', sanitizeOcr({ source: 'label', text: '', title: '', ingredients: [], contains: [], may_contain: [], confidence: 1, warnings: [] }, 't').likelyIngredients.length === 0);
+check('schéma OCR : likely_ingredients exigé (liste, éventuellement vide)', OCR_OUTPUT_SCHEMA.required.includes('likely_ingredients'));
+check('langue : consigne anglaise seulement pour « en »', languageInstruction('en').includes('English') && languageInstruction('fr') === '' && languageInstruction(undefined) === '');
 
 console.log(failures === 0 ? '\nTOUS LES TESTS IA PASSENT' : `\n${failures} ÉCHEC(S)`);
 process.exit(failures ? 1 : 0);

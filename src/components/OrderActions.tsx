@@ -11,6 +11,7 @@ import { fetchOrder, OrderAction, OrderSummary, transitionOrder } from '@/servic
 import { colors, fonts, radius, spacing } from '@/theme';
 import { Button } from './ui';
 
+import { t } from '@/i18n';
 const STATUS_LABEL: Record<string, string> = {
   requested: 'En attente de réponse',
   paid: 'Paiement pré-autorisé · en attente du Cooker',
@@ -31,14 +32,14 @@ function actionsFor(o: OrderSummary, me: string): ActionDef[] {
   const awaitingCooker = o.kind === 'swap' ? o.status === 'requested' : o.status === 'paid';
   if (cooker && awaitingCooker)
     return [
-      { to: 'accepted', label: 'Accepter', variant: 'primary' },
-      { to: 'declined', label: 'Refuser', variant: 'danger' },
+      { to: 'accepted', label: t('Accepter'), variant: 'primary' },
+      { to: 'declined', label: t('Refuser'), variant: 'danger' },
     ];
-  if (cooker && o.status === 'accepted') return [{ to: 'ready', label: 'Le plat est prêt', variant: 'primary' }];
+  if (cooker && o.status === 'accepted') return [{ to: 'ready', label: t('Le plat est prêt'), variant: 'primary' }];
   if (eater && (o.status === 'ready' || (o.kind === 'swap' && o.status === 'accepted')))
-    return [{ to: 'picked_up', label: "J'ai récupéré", variant: 'accent' }];
-  if (eater && ['requested', 'paid'].includes(o.status)) return [{ to: 'cancelled', label: 'Annuler', variant: 'secondary' }];
-  if (['picked_up', 'completed'].includes(o.status)) return [{ to: 'review', label: 'Laisser un avis', variant: 'accent' }];
+    return [{ to: 'picked_up', label: t("J'ai récupéré"), variant: 'accent' }];
+  if (eater && ['requested', 'paid'].includes(o.status)) return [{ to: 'cancelled', label: t('Annuler'), variant: 'secondary' }];
+  if (['picked_up', 'completed'].includes(o.status)) return [{ to: 'review', label: t('Laisser un avis'), variant: 'accent' }];
   return [];
 }
 
@@ -62,7 +63,7 @@ export function OrderActions({ orderId, me, refreshKey }: { orderId: string; me:
       load();
       if (a.to === 'picked_up') router.push({ pathname: '/review/[orderId]', params: { orderId } });
     } catch (e) {
-      Alert.alert('Action impossible', friendlyError(e));
+      Alert.alert(t('Action impossible'), friendlyError(e));
     } finally {
       setBusy(false);
     }
@@ -74,7 +75,7 @@ export function OrderActions({ orderId, me, refreshKey }: { orderId: string; me:
       <View style={styles.row}>
         <Ionicons name={order.kind === 'swap' ? 'swap-horizontal' : 'bag-check-outline'} size={18} color={colors.forest} />
         <Text style={styles.label} numberOfLines={1}>
-          {order.kind === 'swap' ? 'Échange' : 'Commande'} · {STATUS_LABEL[order.status] ?? order.status}
+          {order.kind === 'swap' ? t('Échange') : t('Commande')} · {STATUS_LABEL[order.status] ? t(STATUS_LABEL[order.status]) : order.status}
         </Text>
       </View>
       {actions.length > 0 && (

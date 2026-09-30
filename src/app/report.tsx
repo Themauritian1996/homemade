@@ -10,6 +10,7 @@ import { ReportReason, sendReport } from '@/services/account';
 import { useApp } from '@/store/app';
 import { colors, fonts, radius, spacing, type } from '@/theme';
 
+import { t } from '@/i18n';
 const REASONS: { id: ReportReason; label: string; hint: string }[] = [
   { id: 'allergen_incident', label: 'Réaction allergique / allergène non déclaré', hint: 'Le plat est retiré immédiatement.' },
   { id: 'hygiene', label: 'Problème d’hygiène ou plat avarié', hint: 'Le plat est retiré immédiatement.' },
@@ -34,14 +35,14 @@ export default function Report() {
     try {
       await sendReport(user.id, { reason, details, mealId, subjectId, orderId });
       Alert.alert(
-        'Merci',
+        t('Merci'),
         reason === 'allergen_incident' || reason === 'hygiene'
-          ? 'Le plat a été retiré de l’app pendant la vérification.'
-          : 'Votre signalement a été transmis à l’équipe.',
+          ? t('Le plat a été retiré de l’app pendant la vérification.')
+          : t('Votre signalement a été transmis à l’équipe.'),
       );
       router.back();
     } catch (e) {
-      Alert.alert('Envoi impossible', friendlyError(e));
+      Alert.alert(t('Envoi impossible'), friendlyError(e));
     } finally {
       setSending(false);
     }
@@ -49,14 +50,14 @@ export default function Report() {
 
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScreenHeader title="Signaler" subtitle={title} modal />
+      <ScreenHeader title={t('Signaler')} subtitle={title} modal />
       <ScrollView
         contentContainerStyle={{ padding: spacing.xl, paddingTop: spacing.sm, gap: spacing.md, paddingBottom: insets.bottom + spacing.huge }}
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.urgent}>
           <Ionicons name="warning" size={18} color={colors.danger} />
-          <Text style={[type.caption, { flex: 1, color: colors.danger }]}>Réaction allergique grave : appelez le 911 avant tout.</Text>
+          <Text style={[type.caption, { flex: 1, color: colors.danger }]}>{t('Réaction allergique grave : appelez le 911 avant tout.')}</Text>
         </View>
         {REASONS.map((r) => (
           <Pressable
@@ -68,21 +69,21 @@ export default function Report() {
           >
             <Ionicons name={reason === r.id ? 'radio-button-on' : 'radio-button-off'} size={20} color={reason === r.id ? colors.forest : colors.muted} />
             <View style={{ flex: 1 }}>
-              <Text style={type.bodyStrong}>{r.label}</Text>
-              {!!r.hint && <Text style={type.caption}>{r.hint}</Text>}
+              <Text style={type.bodyStrong}>{t(r.label)}</Text>
+              {!!r.hint && <Text style={type.caption}>{t(r.hint)}</Text>}
             </View>
           </Pressable>
         ))}
         <TextInput
           value={details}
           onChangeText={setDetails}
-          placeholder="Décrivez ce qui s’est passé (facultatif)"
+          placeholder={t('Décrivez ce qui s’est passé (facultatif)')}
           placeholderTextColor={colors.muted}
           multiline
           maxLength={2000}
           style={styles.input}
         />
-        <Button title="Envoyer le signalement" variant="danger" icon="flag-outline" onPress={submit} loading={sending} disabled={!reason} />
+        <Button title={t('Envoyer le signalement')} variant="danger" icon="flag-outline" onPress={submit} loading={sending} disabled={!reason} />
       </ScrollView>
     </KeyboardAvoidingView>
   );

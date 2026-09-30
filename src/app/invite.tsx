@@ -9,6 +9,7 @@ import { friendlyError } from '@/lib/errors';
 import { fetchMyInvite, MyInvite } from '@/services/account';
 import { colors, fonts, radius, shadow, spacing, type } from '@/theme';
 
+import { t } from '@/i18n';
 export default function Invite() {
   const insets = useSafeAreaInsets();
   const [invite, setInvite] = useState<MyInvite | null>(null);
@@ -16,30 +17,27 @@ export default function Invite() {
   useEffect(() => {
     fetchMyInvite()
       .then(setInvite)
-      .catch((e) => Alert.alert('Code indisponible', friendlyError(e)));
+      .catch((e) => Alert.alert(t('Code indisponible'), friendlyError(e)));
   }, []);
 
   const share = () => {
     if (!invite) return;
     const lines = [
-      'Je teste Homemade, une app pour échanger des repas faits maison entre voisins 🍲',
-      `Ton code d'invitation : ${invite.code}`,
-      config.betaDownloadUrl ? `Installer l'app (Android) : ${config.betaDownloadUrl}` : null,
-      `Déjà installée ? Ouvre ce lien : homemade://sign-up?code=${invite.code}`,
+      t('Je teste Homemade : des voisins qui aiment cuisiner partagent leurs plats et meal preps avec ceux qui aiment bien manger 🍲 Plus sain, moins de gaspillage !'),
+      t('Ton code d’invitation : {code}', { code: invite.code }),
+      config.betaDownloadUrl ? t('Installer l’app (Android) : {url}', { url: config.betaDownloadUrl }) : null,
+      t('Déjà installée ? Ouvre ce lien : {link}', { link: `homemade://sign-up?code=${invite.code}` }),
     ];
     Share.share({ message: lines.filter(Boolean).join('\n') }).catch(() => {});
   };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <ScreenHeader title="Inviter des voisins" />
+      <ScreenHeader title={t('Inviter des voisins')} />
       <ScrollView contentContainerStyle={{ padding: spacing.xl, gap: spacing.xl, paddingBottom: insets.bottom + spacing.huge }}>
-        <Text style={type.body}>
-          Homemade est en bêta fermée. Plus il y a de cuisiniers autour de vous, plus il y a de bons plats à échanger : invitez les voisins, collègues et amis
-          qui aiment cuisiner.
-        </Text>
+        <Text style={type.body}>{t('Homemade est en bêta fermée. Plus il y a de cuisiniers autour de vous, plus il y a de bons plats à échanger : invitez les voisins, collègues et amis qui aiment cuisiner.')}</Text>
         <View style={styles.codeCard}>
-          <Text style={[type.label, { color: 'rgba(255,255,255,0.75)' }]}>Votre code d'invitation</Text>
+          <Text style={[type.label, { color: 'rgba(255,255,255,0.75)' }]}>{t('Votre code d\'invitation')}</Text>
           {invite ? (
             <Text style={styles.code} selectable>
               {invite.code}
@@ -50,12 +48,12 @@ export default function Invite() {
           {invite && (
             <Text style={[type.caption, { color: 'rgba(255,255,255,0.8)' }]}>
               {invite.remaining > 0
-                ? `${invite.remaining} invitation(s) restante(s) sur ${invite.maxUses}`
-                : 'Toutes vos invitations ont été utilisées. Merci !'}
+                ? t('{0} invitation(s) restante(s) sur {1}', { 0: invite.remaining, 1: invite.maxUses })
+                : t('Toutes vos invitations ont été utilisées. Merci !')}
             </Text>
           )}
         </View>
-        <Button title="Partager mon invitation" variant="accent" icon="share-social-outline" onPress={share} disabled={!invite || invite.remaining === 0} />
+        <Button title={t('Partager mon invitation')} variant="accent" icon="share-social-outline" onPress={share} disabled={!invite || invite.remaining === 0} />
         <View style={styles.steps}>
           {[
             [
@@ -71,7 +69,7 @@ export default function Invite() {
               <View style={styles.stepIcon}>
                 <Ionicons name={icon as React.ComponentProps<typeof Ionicons>['name']} size={18} color={colors.forest} />
               </View>
-              <Text style={[type.body, { flex: 1 }]}>{text}</Text>
+              <Text style={[type.body, { flex: 1 }]}>{t(text)}</Text>
             </View>
           ))}
         </View>

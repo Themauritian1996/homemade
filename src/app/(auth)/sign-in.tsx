@@ -1,52 +1,116 @@
+import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
 import { AuthScaffold } from '@/components/AuthScaffold';
 import { Button, TextField } from '@/components/ui';
+import { t } from '@/i18n';
 import { friendlyError } from '@/lib/errors';
-import { sendPasswordReset, signIn } from '@/services/auth';
+import { emailCodesEnabled, resendEmailCode, sendPasswordReset, signIn } from '@/services/auth';
+import { useApp } from '@/store/app';
 import { colors, fonts, spacing, type } from '@/theme';
 
 export default function SignIn() {
-  const [email, setEmail] = useState('');
+  // Le dernier courriel utilisé est retenu sur ce téléphone ; le mot de passe, lui, reste au gestionnaire de mots de passe du téléphone.
+  const [email, setEmail] = useState(useApp.getState().lastEmail);
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>();
 
+  const cleanEmail = () => email.trim().toLowerCase();
+
   const submit = async () => {
     setError(undefined);
-    if (!email.includes('@') || password.length < 8) {
-      setError('Courriel ou mot de passe invalide (8 caractères minimum).');
+    if (!cleanEmail().includes('@') || password.length < 8) {
+      setError(t('Courriel ou mot de passe invalide (8 caractères minimum).'));
       return;
     }
     setLoading(true);
     try {
-      await signIn(email.trim().toLowerCase(), password);
+      await signIn(cleanEmail(), password);
     } catch (e) {
-      setError(friendlyError(e, 'Connexion impossible.'));
+      // Compte créé mais pas encore confirmé : on renvoie un code et on ouvre l'écran de saisie.
+      if ((e as { code?: string })?.code === 'email_not_confirmed' || /not confirmed/i.test(String((e as Error)?.message))) {
+        await resendEmailCode(cleanEmail(), 'signup').catch(() => {});
+        router.push({ pathname: '/verify', params: { email: cleanEmail(), mode: 'signup' } });
+        return;
+      }
+      setError(friendlyError(e, t('Connexion impossible.')));
     } finally {
       setLoading(false);
     }
   };
 
   const reset = async () => {
-    if (!email.includes('@')) return setError('Entrez votre courriel pour recevoir le lien.');
-    await sendPasswordReset(email.trim().toLowerCase()).catch(() => {});
-    Alert.alert('Courriel envoyé', 'Si un compte existe, vous recevrez un lien de réinitialisation.');
+    setError(undefined);
+    if (!cleanEmail().includes('@')) return setError(t('Entrez votre courriel pour recevoir un code.'));
+    if (!(await emailCodesEnabled())) {
+      Alert.alert(
+        t('Mot de passe oublié'),
+        t('La réinitialisation par courriel n’est pas encore activée pendant la bêta. Écrivez à la personne qui vous a invité : elle peut réinitialiser votre compte.'),
+      );
+      return;
+    }
+    try {
+      await sendPasswordReset(cleanEmail());
+    } catch (e) {
+      return setError(friendlyError(e, t('Envoi impossible pour le moment.')));
+    }
+    router.push({ pathname: '/verify', params: { email: cleanEmail(), mode: 'recovery' } });
   };
 
   return (
-    <AuthScaffold title="Bon retour 👋" subtitle="Connectez-vous pour retrouver les plats de votre quartier.">
+    <AuthScaffold title={t('Bon retour 👋')} subtitle={t('Connectez-vous pour retrouver les plats et les cuisiniers de votre quartier.')}>
       <View style={{ gap: spacing.lg }}>
-        <TextField label="Courriel" icon="mail-outline" placeholder="vous@exemple.com" autoCapitalize="none" keyboardType="email-address" autoComplete="email" value={email} onChangeText={setEmail} />
-        <TextField label="Mot de passe" icon="lock-closed-outline" placeholder="••••••••" secureTextEntry autoComplete="password" value={password} onChangeText={setPassword} error={error} />
-        <Pressable onPress={reset} style={{ alignSelf: 'flex-end' }} hitSlop={8}>
-          <Text style={{ fontFamily: fonts.semibold, color: colors.forest }}>Mot de passe oublié ?</Text>
+        <TextField
+          label={t('Courriel')}
+          icon="mail-outline"
+          placeholder={t('vous@exemple.com')}
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType="email-address"
+          autoComplete="email"
+          textContentType="username"
+          importantForAutofill="yes"
+          value={email}
+          onChangeText={setEmail}
+        />
+        <View>
+          <TextField
+            label={t('Mot de passe')}
+            icon="lock-closed-outline"
+            placeholder="••••••••"
+            secureTextEntry={!showPassword}
+            autoComplete="current-password"
+            textContentType="password"
+            importantForAutofill="yes"
+            value={password}
+            onChangeText={setPassword}
+            onSubmitEditing={submit}
+            returnKeyType="go"
+          />
+          <Pressable
+            onPress={() => setShowPassword(!showPassword)}
+            style={{ position: 'absolute', right: spacing.md, bottom: 14 }}
+            hitSlop={10}
+            accessibilityLabel={showPassword ? t('Masquer le mot de passe') : t('Afficher le mot de passe')}
+          >
+            <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color={colors.muted} />
+          </Pressable>
+        </View>
+        {error && <Text style={[type.caption, { color: colors.danger }]}>{error}</Text>}
+        <Pressable onPress={reset} style={{ alignSelf: 'flex-end' }} hitSlop={8} accessibilityRole="button">
+          <Text style={{ fontFamily: fonts.semibold, color: colors.forest }}>{t('Mot de passe oublié ?')}</Text>
         </Pressable>
-        <Button title="Se connecter" onPress={submit} loading={loading} />
-        <Pressable onPress={() => router.replace('/sign-up')} style={{ alignSelf: 'center', marginTop: spacing.md }}>
+        <Button title={t('Se connecter')} onPress={submit} loading={loading} />
+        <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'center', justifyContent: 'center' }}>
+          <Ionicons name="phone-portrait-outline" size={14} color={colors.muted} />
+          <Text style={type.caption}>{t('Vous restez connecté sur ce téléphone jusqu’à la déconnexion.')}</Text>
+        </View>
+        <Pressable onPress={() => router.replace('/sign-up')} style={{ alignSelf: 'center', marginTop: spacing.md }} accessibilityRole="button">
           <Text style={type.body}>
-            Nouveau sur Homemade ? <Text style={{ fontFamily: fonts.semibold, color: colors.tomato }}>Créer un compte</Text>
+            {t('Nouveau sur Homemade ?')} <Text style={{ fontFamily: fonts.semibold, color: colors.tomato }}>{t('Créer un compte')}</Text>
           </Text>
         </Pressable>
       </View>

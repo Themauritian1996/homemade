@@ -5,6 +5,7 @@ import type { MapCommand } from '@/lib/mapHtml';
 import { colors } from '@/theme';
 import { LeafletMapHandle, LeafletMapProps, useMapBridge } from './mapBridge';
 
+import { t } from '@/i18n';
 export type { LeafletMapHandle, LeafletMapProps } from './mapBridge';
 
 export const LeafletMap = forwardRef<LeafletMapHandle, LeafletMapProps>(function LeafletMap(props, ref) {
@@ -26,7 +27,7 @@ export const LeafletMap = forwardRef<LeafletMapHandle, LeafletMapProps>(function
 
   return (
     <View style={[{ flex: 1, backgroundColor: colors.surfaceAlt, overflow: 'hidden' }, props.style]}>
-      <iframe ref={frame} srcDoc={html} title="Carte" style={{ border: 0, width: '100%', height: '100%' }} />
+      <iframe ref={frame} srcDoc={html} title={t('Carte')} style={{ border: 0, width: '100%', height: '100%' }} />
     </View>
   );
 });

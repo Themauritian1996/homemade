@@ -1,14 +1,15 @@
 /**
- * Carte interactive sans clé : Leaflet (chargé depuis le CDN, empreinte SRI vérifiée) + fond OpenStreetMap
- * rendu par CARTO. Affichée dans une WebView (Android/iOS) ou une iframe (aperçu web) : le même code partout,
+ * Carte interactive sans clé : Leaflet (embarqué dans l'app, aucun CDN à charger) + fond OpenStreetMap
+ * rendu par CARTO, avec repli sur les tuiles d'OpenStreetMap si CARTO ne répond pas. Affichée dans une WebView (Android/iOS) ou une iframe (aperçu web) : le même code partout,
  * y compris dans l'APK sans clé Google Maps.
  *
  * Protocole :
  *   app → carte : window.__hmHandle({ cmd: 'update', state }) · { cmd: 'flyTo', lat, lng, zoom }
- *   carte → app : { type: 'ready' } · { type: 'select', id } · { type: 'pick', lat, lng } · { type: 'error', reason }
+ *   carte → app : { type: 'ready' } · { type: 'tiles' } (premier fond affiché) · { type: 'select', id } · { type: 'pick', lat, lng } · { type: 'error', reason }
  */
 import type { GeoPoint } from '@/types';
 import { colors } from '@/theme';
+import { LEAFLET_CSS, LEAFLET_JS } from './leafletInline';
 
 export interface MapMarker {
   id: string;
@@ -34,18 +35,14 @@ export type MapCommand =
   /** Cadre la carte sur ces points, en laissant libres les zones couvertes par l'interface (px). */
   | { cmd: 'fit'; points: GeoPoint[]; top: number; bottom: number };
 
-export type MapEvent = { type: 'ready' } | { type: 'select'; id: string } | { type: 'pick'; lat: number; lng: number } | { type: 'error'; reason: string };
-
-const LEAFLET = {
-  css: 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
-  cssIntegrity: 'sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=',
-  js: 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
-  jsIntegrity: 'sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=',
-};
+export type MapEvent = { type: 'ready' } | { type: 'tiles' } | { type: 'select'; id: string } | { type: 'pick'; lat: number; lng: number } | { type: 'error'; reason: string };
 
 /** Fond « Voyager » de CARTO (données OpenStreetMap) : gratuit, sans clé, lisible, attribution obligatoire. */
 const TILES = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
 const ATTRIBUTION = '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · © <a href="https://carto.com/attributions">CARTO</a>';
+/** Secours : tuiles standard d'OpenStreetMap (si CARTO est bloqué par le réseau). */
+const TILES_FALLBACK = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+const ATTRIBUTION_FALLBACK = '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
 
 export function buildMapHtml(center: GeoPoint, zoom: number): string {
   const init = JSON.stringify({ lat: center.latitude, lng: center.longitude, zoom });
@@ -53,7 +50,7 @@ export function buildMapHtml(center: GeoPoint, zoom: number): string {
 <html lang="fr"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<link rel="stylesheet" href="${LEAFLET.css}" integrity="${LEAFLET.cssIntegrity}" crossorigin="">
+<style>${LEAFLET_CSS}</style>
 <style>
   html, body, #map { margin: 0; height: 100%; background: #F5F1EA; }
   .leaflet-container { background: #F5F1EA; font-family: -apple-system, Roboto, "Segoe UI", sans-serif; -webkit-tap-highlight-color: transparent; }
@@ -79,7 +76,7 @@ export function buildMapHtml(center: GeoPoint, zoom: number): string {
   }
   function hmFail(reason) { hmSend({ type: 'error', reason: reason }); }
 </script>
-<script src="${LEAFLET.js}" integrity="${LEAFLET.jsIntegrity}" crossorigin="" onerror="hmFail('leaflet')"></script>
+<script>${LEAFLET_JS}</script>
 </head><body><div id="map"></div>
 <script>
 (function () {
@@ -87,11 +84,23 @@ export function buildMapHtml(center: GeoPoint, zoom: number): string {
   var init = ${init};
   var map = L.map('map', { zoomControl: false, attributionControl: true }).setView([init.lat, init.lng], init.zoom);
   map.attributionControl.setPrefix(false);
-  var loaded = 0, failed = 0;
-  L.tileLayer('${TILES}', { subdomains: 'abcd', maxZoom: 19, attribution: '${ATTRIBUTION}' })
-    .on('tileload', function () { loaded++; })
-    .on('tileerror', function () { failed++; if (failed === 8 && loaded === 0) hmFail('tiles'); })
-    .addTo(map);
+  // Fond de carte : CARTO, puis OpenStreetMap si aucune tuile CARTO ne se charge.
+  var loaded = 0, failed = 0, fallback = false, layer = null;
+  function addTiles(url, attribution, subdomains) {
+    if (layer) map.removeLayer(layer);
+    loaded = 0; failed = 0;
+    layer = L.tileLayer(url, { subdomains: subdomains, maxZoom: 19, attribution: attribution })
+      .on('tileload', function () { if (!loaded++) hmSend({ type: 'tiles' }); })
+      .on('tileerror', function () {
+        failed++;
+        if (failed === 6 && loaded === 0) {
+          if (!fallback) { fallback = true; addTiles('${TILES_FALLBACK}', '${ATTRIBUTION_FALLBACK}', 'abc'); }
+          else hmFail('tiles');
+        }
+      })
+      .addTo(map);
+  }
+  addTiles('${TILES}', '${ATTRIBUTION}', 'abcd');
 
   function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function icon(html) { return L.divIcon({ className: '', html: html, iconSize: [0, 0] }); }

@@ -122,6 +122,16 @@ const [pub] = await q(`select status, allergens_confirmed_at is not null as conf
 check('plat publié avec confirmation horodatée', pub.status === 'published' && pub.confirmed);
 check('point public brouillé de 100 à 300 m', pub.jitter >= 99 && pub.jitter <= 301, `${Math.round(pub.jitter)} m`);
 
+// 1b) Nouvelles catégories (meal prep, déjeuner) : référentiel à jour et publication acceptée
+const cats = (await q(`select code from public.cuisines where code in ('meal_prep', 'breakfast')`)).map((r) => r.code).sort();
+check('catégories « meal prep » et « déjeuner » présentes', cats.join() === 'breakfast,meal_prep', cats.join());
+const [{ publish_meal: mealPrep }] = await q(`select public.publish_meal($1::jsonb)`, [
+  JSON.stringify({ ...basePayload, title: 'Meal prep poulet riz', cuisine: 'meal_prep', mode: 'swap', priceCents: null, diets: [], declaredAllergens: [],
+    ingredients: [{ name: 'Poulet', allergens: [], source: 'ai' }, { name: 'Riz', allergens: [], source: 'ai' }] }),
+]);
+check('publication d’un meal prep', typeof mealPrep === 'string');
+await q(`select public.withdraw_meal($1)`, [mealPrep]);
+
 // 2) Implication blé ⇒ gluten
 const [{ publish_meal: meal2 }] = await q(`select public.publish_meal($1::jsonb)`, [
   JSON.stringify({ ...basePayload, title: 'Ramen maison', cuisine: 'asian', mode: 'sale', diets: [], declaredAllergens: ['egg'],

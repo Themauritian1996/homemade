@@ -59,6 +59,19 @@ Obligatoire : **2 secrets** (`GEMINI_API_KEY`, `SUPABASE_ACCESS_TOKEN`). Faculta
 
 3. Rien d'autre à configurer : le robot lit lui-même l'adresse et la clé **publique** du projet avec ce jeton, pour le serveur comme pour l'APK. (Le secret `SUPABASE_DB_PASSWORD`, s'il existe, n'est plus utilisé : tu peux le supprimer.)
 
+### 2-C. (Facultatif, recommandé) Codes par courriel avec ton Gmail — 5 min, 0 $
+Sans cette étape, l'inscription est immédiate mais **« Mot de passe oublié »** ne peut pas envoyer de courriel (le service de courriel gratuit de Supabase n'écrit qu'aux membres de ton équipe Supabase). Avec elle, chaque nouveau compte reçoit un **code à 6 chiffres** à taper dans l'app, et le mot de passe oublié fonctionne.
+1. Sur ton compte Google : **https://myaccount.google.com/security** → active la **Validation en deux étapes** si ce n'est pas fait.
+2. Va sur **https://myaccount.google.com/apppasswords** → nom : `Homemade` → **Créer** → copie le mot de passe de 16 lettres (ex. `abcd efgh ijkl mnop`).
+3. Dans GitHub (même page qu'en 2-B), ajoute deux secrets :
+
+| Name (exactement) | Valeur |
+|---|---|
+| `GMAIL_ADDRESS` | ton adresse Gmail (ex. `homemade.beta@gmail.com`) — idéalement une adresse Gmail créée pour la bêta |
+| `GMAIL_APP_PASSWORD` | le mot de passe de 16 lettres (les espaces sont acceptés) |
+
+4. Relance **Serveur Supabase** (étape 3). Dans le journal, l'étape « Réglages d'inscription et courriels » doit afficher **✓ Courriels activés**. Gmail permet environ 500 courriels par jour : largement assez.
+
 ## Étape 3 — Lancer la mise à jour du serveur (2 min, puis 3 min d'attente)
 
 La nouvelle version est déjà dans la branche principale (`main`) : l'APK se fabrique tout seul (≈ 25 min, robot **APK Android**).
@@ -109,6 +122,7 @@ Envoie-leur par WhatsApp ou courriel, par exemple :
 - **Commentaires des testeurs** : Supabase → **Table Editor** → `beta_feedback`. **Signalements** : `reports`.
 - **L'IA fonctionne-t-elle ?** Dans l'app, onglet **Publier** : « IA active » = oui. Détail de chaque analyse : table `ai_analyses` (colonne `provider` = gemini ou groq, `status` = ok ou failed).
 - **Mettre à jour l'app** : chaque changement fusionné dans `main` refait automatiquement un APK au même lien. Tes testeurs l'installent par-dessus.
+- **Test automatique sur Android** : après chaque nouvel APK, le robot **« Test Android (émulateur) »** l'installe sur un téléphone Android virtuel, se connecte avec un compte temporaire, ouvre le fil, **la carte**, Publier et les Paramètres, puis supprime le compte. ✅ = tout va bien. Les captures d'écran sont dans la branche **`e2e-captures`** du dépôt.
 - iPhone : l'APK est pour Android seulement (une version iPhone demande un compte Apple Developer payant).
 
 ---
@@ -173,33 +187,35 @@ Quand je modifie l'app, une nouvelle version apparaît au même lien (**releases
 ## Partie 3 — Utiliser l'app
 
 ### Créer un compte
+0. **Langue** : touche **FR / EN** en haut de l'écran d'accueil (modifiable ensuite dans Profil → Paramètres).
 1. **Créer un compte** → **code d'invitation** (ex. `VOISINS2026`), prénom, courriel, mot de passe (8 caractères minimum) → coche la case → **Créer mon compte**.
-2. **Profil santé** : touche tes allergies (elles deviennent rouges). Pour chacune, choisis *Allergie* ou *Intolérance*.
-3. **Enregistrer et continuer**. Si l'app demande ta position, accepte : elle sert à trouver les plats près de toi.
+2. Si les codes par courriel sont activés (étape 2-C) : entre le **code à 6 chiffres** reçu par courriel.
+3. **Bienvenue à la table** : indique si tu veux un régime (végé, halal…) ou une allergie — facultatif. **Continuer**. Si l'app demande ta position, accepte : elle sert à trouver les plats près de toi.
+4. Tu restes connecté sur ton téléphone jusqu'à **Se déconnecter** ; ton courriel est pré-rempli à la connexion suivante, et Android propose d'enregistrer le mot de passe.
 
 ### Les 5 onglets du bas
 | Onglet | À quoi il sert |
 |---|---|
-| 🍴 **Découvrir** | Les plats autour de toi, avec une **barre de recherche** (plat, ingrédient, quartier). Ceux dangereux pour tes allergies sont **automatiquement cachés** ; le bandeau vert indique combien. |
+| 🍴 **Découvrir** | Les plats et **meal preps** autour de toi, avec une **barre de recherche** (plat, ingrédient, quartier) et des catégories (Meal prep, Bol santé, Déjeuner…). Tes préférences alimentaires sont appliquées automatiquement. |
 | 🗺️ **Carte** | Carte interactive (OpenStreetMap) : touche une pastille de prix pour voir le plat. Bouton ☰ pour la liste, ⚙️ pour filtrer, ➤ pour te localiser. |
 | 📷 **Publier** | Photographier ton plat. L'IA remplit l'annonce et peut **lire une étiquette ou une recette**. |
 | 💬 **Messages** | Discuter, accepter un échange, confirmer la récupération. Une pastille rouge indique les messages non lus. |
 | 👤 **Profil** | Notes, profil santé, **Mes plats**, **Mes favoris**, **Invitez vos voisins**, **Paramètres** (photo, quartier, rayon, données), **Aide**, **Donner mon avis**. |
 
 ### Publier un plat avec l'IA
-> Avec l'**APK** (méthode A), l'étape 3 est sautée : le formulaire s'ouvre vide et tu remplis toi-même le titre, les ingrédients et les allergènes.
+> Avec l'**APK** (méthode A), l'analyse passe par l'IA **en ligne et gratuite** (Gemini). Si elle est indisponible, le formulaire s'ouvre vide et tu remplis toi-même le titre et les ingrédients.
 
 1. Onglet **Publier** → **Photographier mon plat** (ou **Choisir dans la galerie**).
 2. Recadre la photo, puis valide.
-3. **Analyse en cours** : environ **15 secondes**. L'IA tourne sur ton PC, gratuitement.
+3. **Analyse en cours** : 5 à 15 secondes. L'IA reconnaît le plat et liste les **ingrédients habituels** de la recette (marqués « probable »).
 4. L'annonce est pré-remplie : titre, description, type de cuisine, ingrédients, allergènes.
 5. **Vérifie tout** :
    - un ingrédient avec le badge **« à vérifier »** est incertain ;
-   - touche un ingrédient pour modifier ses allergènes, ou 🗑️ pour le supprimer ;
+   - touche un ingrédient pour le **renommer** ou modifier ses allergènes, ou 🗑️ pour le supprimer (ex. un ingrédient « probable » que tu n'as pas mis) ;
    - ajoute les ingrédients oubliés dans **« Ajouter un ingrédient »** ;
    - les allergènes avec un **point jaune** ont été proposés par l'IA ;
-   - tu as utilisé une **sauce, un bouillon ou un produit acheté** ? Touche **« Scanner une étiquette ou une recette »** et photographie sa liste d'ingrédients : l'IA ajoute le produit, ses allergènes (« Contient ») et ses traces (« Peut contenir »). Compare avec le texte lu, puis **Ajouter à mon annonce**.
-6. **Mode** : pendant la bêta, les plats s'**échangent** (la vente viendra avec Stripe).
+   - tu as utilisé une **sauce, un bouillon ou un produit acheté** ? Touche **« Scanner une étiquette ou une recette »** et photographie sa liste d'ingrédients : l'IA ajoute le produit, ses allergènes (« Contient ») et ses traces (« Peut contenir »). Compare avec le texte lu, puis **Ajouter à mon annonce**. Pour une **recette**, l'IA propose aussi les **ingrédients habituels du plat** qui ne sont pas écrits : ils sont cochés, décoche ceux que tu n'as pas mis.
+6. **Mode** : pendant la bêta, les plats s'**échangent** (la vente viendra avec Stripe). Quand la vente sera active, le prix suggéré est de **5 $ la portion** (choix rapides 4, 5, 6 ou 8 $).
 7. Nombre de portions, durée de disponibilité, puis le **lieu de cueillette** : touche la carte ou glisse l'épingle (ou « Utiliser ma position actuelle »). Le quartier se remplit tout seul ; ton adresse exacte reste privée.
 8. Coche **« J'ai vérifié la liste des ingrédients et des allergènes »** → **Publier le plat**.
 
@@ -282,7 +298,7 @@ Pour changer : remplace la valeur, enregistre, puis relance `Lancer-Homemade.bat
 
 ---
 
-## Partie 8 — Coûts
+## Partie 8 — Coûts et capacité
 
 | Service | Aujourd'hui (tests) | Plus tard (vraie app) |
 |---|---|---|
@@ -293,6 +309,20 @@ Pour changer : remplace la valeur, enregistre, puis relance `Lancer-Homemade.bat
 | GitHub (APK et robots) | **0 $** — dépôt public : illimité ; dépôt privé : 2 000 minutes / mois (≈ 70 APK) | Idem |
 | Carte (OpenStreetMap / CARTO) | **0 $**, aucune clé | Au-delà de ~75 000 affichages / mois, prévoir un fournisseur payant ou un compte CARTO |
 | Stripe (paiements) | Non activé | Mode test gratuit. En réel : environ 2,9 % + 0,30 $ par paiement (à vérifier sur stripe.com/ca/pricing) |
+| Courriels (Gmail, étape 2-C) | **0 $** — environ 500 courriels / jour | Service d'envoi dédié (ex. Resend, Brevo) avec ton propre nom de domaine |
+
+### Combien de testeurs en même temps ? (plans gratuits)
+| Ressource | Limite gratuite | Pour ~100 personnes actives |
+|---|---|---|
+| Comptes (Supabase Auth) | 50 000 utilisateurs actifs / mois | ✅ Aucun souci |
+| Requêtes de l'app (fil, carte, chat) | Illimitées ; 200 connexions temps réel simultanées | ✅ 100 personnes connectées en même temps passent |
+| Base de données | 500 Mo | ✅ Des dizaines de milliers de plats et messages |
+| Photos (stockage) | 1 Go | ⚠️ ≈ 5 000 photos (≈ 200 Ko chacune) : à surveiller après quelques mois |
+| Trafic sortant (photos affichées) | 5 Go / mois (+ 5 Go via le cache) | ⚠️ **Première limite à surveiller** : ≈ 50 000 affichages de photos / mois. Les photos sont gardées en cache sur chaque téléphone, ce qui aide beaucoup |
+| IA Gemini (gratuite) | ≈ 10 à 30 analyses / minute et quelques centaines à 1 000 / jour selon le modèle (Google ajuste ces quotas) | ✅ 100 à 300 plats publiés par jour passent ; en cas de pic, l'app bascule sur un autre modèle, sur Groq (1 000 / jour), puis sur la saisie manuelle |
+| Serveur en pause | Après 7 jours **sans aucune activité** | ✅ Une bêta active ne s'arrête jamais ; sinon, un clic sur « Restore » dans Supabase |
+
+En résumé : **100 testeurs actifs, et même quelques centaines, tiennent dans les plans gratuits.** Supabase → **Reports** (ou **Usage**) montre la consommation ; au-delà, le plan Pro de Supabase coûte environ 25 $ US / mois.
 
 ---
 

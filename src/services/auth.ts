@@ -5,7 +5,8 @@
  * En mode démo, crée une session locale fictive.
  */
 import { Alert } from 'react-native';
-import { DEMO_MODE } from '@/lib/config';
+import { t } from '@/i18n';
+import { config, DEMO_MODE } from '@/lib/config';
 import { requireSupabase } from '@/lib/supabase';
 import { SessionUser, useApp } from '@/store/app';
 import { DEMO_USER_ID } from '@/data/mock';
@@ -45,8 +46,44 @@ export async function signUp(params: { email: string; password: string; displayN
     options: { data: { display_name: params.displayName, invite_code: params.inviteCode.trim() }, emailRedirectTo: 'homemade://auth/callback' },
   });
   if (error) throw error;
+  useApp.getState().setLastEmail(params.email);
   // La session est ouverte par listenToAuth (après lecture de l'état serveur).
+  // Sans session : courriels actifs, le compte se confirme avec le code reçu (écran /verify).
   return { needsEmailConfirmation: !data.session };
+}
+
+/**
+ * Courriels actifs sur le serveur (confirmation de compte, mot de passe oublié) ? Lu dans les réglages publics
+ * de Supabase Auth : ils ne sont activés que si un service d'envoi est configuré (voir scripts/supabase-deploy.mjs).
+ */
+export async function emailCodesEnabled(): Promise<boolean> {
+  if (DEMO_MODE) return false;
+  try {
+    const res = await fetch(`${config.supabaseUrl}/auth/v1/settings`, { headers: { apikey: config.supabaseAnonKey } });
+    const json = (await res.json()) as { mailer_autoconfirm?: boolean };
+    return json.mailer_autoconfirm === false;
+  } catch {
+    return false;
+  }
+}
+
+export type CodeMode = 'signup' | 'recovery';
+
+/** Code à 6 chiffres reçu par courriel → session ouverte (compte confirmé, ou connexion pour changer le mot de passe). */
+export async function verifyEmailCode(email: string, code: string, mode: CodeMode) {
+  const { error } = await requireSupabase().auth.verifyOtp({ email, token: code.replace(/\D/g, ''), type: mode === 'signup' ? 'email' : 'recovery' });
+  if (error) throw error;
+}
+
+export async function resendEmailCode(email: string, mode: CodeMode) {
+  const sb = requireSupabase();
+  const { error } = mode === 'signup' ? await sb.auth.resend({ type: 'signup', email }) : await sb.auth.resetPasswordForEmail(email);
+  if (error) throw error;
+}
+
+export async function updatePassword(password: string) {
+  const { error } = await requireSupabase().auth.updateUser({ password });
+  if (error) throw error;
 }
 
 export async function signIn(email: string, password: string) {
@@ -56,11 +93,13 @@ export async function signIn(email: string, password: string) {
   }
   const { error } = await requireSupabase().auth.signInWithPassword({ email, password });
   if (error) throw error;
+  useApp.getState().setLastEmail(email);
 }
 
+/** Envoie un code de réinitialisation (à saisir dans l'app, écran /verify). */
 export async function sendPasswordReset(email: string) {
   if (DEMO_MODE) return;
-  const { error } = await requireSupabase().auth.resetPasswordForEmail(email, { redirectTo: 'homemade://auth/reset' });
+  const { error } = await requireSupabase().auth.resetPasswordForEmail(email);
   if (error) throw error;
 }
 
@@ -90,7 +129,7 @@ async function bootstrapSession(user: SessionUser, open: boolean) {
     const b = data as Bootstrap;
     if (b.deleted) {
       await signOut();
-      Alert.alert('Compte supprimé', 'Ce compte a été supprimé. Créez un nouveau compte pour utiliser Homemade.');
+      Alert.alert(t('Compte supprimé'), t('Ce compte a été supprimé. Créez un nouveau compte pour utiliser Homemade.'));
       return;
     }
     store.setHealth(b.health);

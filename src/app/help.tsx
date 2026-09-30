@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, ScreenHeader } from '@/components/ui';
 import { colors, radius, spacing, type } from '@/theme';
 
+import { t } from '@/i18n';
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
 const TOPICS: { icon: IconName; title: string; body: string[] }[] = [
@@ -15,14 +16,15 @@ const TOPICS: { icon: IconName; title: string; body: string[] }[] = [
     title: 'Comment ça marche ?',
     body: [
       'Un seul compte pour manger (Eater) et cuisiner (Cooker).',
-      'Découvrir et Carte montrent les plats autour de vous, déjà filtrés selon votre profil santé.',
+      'Homemade réunit des voisins qui aiment cuisiner et d’autres qui aiment bien manger : plats du jour, meal preps de la semaine, recettes de famille.',
+      'Découvrir et Carte montrent les plats autour de vous, déjà adaptés à vos préférences alimentaires.',
       'Pour échanger : ouvrez un plat, touchez « Échanger » et proposez un de vos plats publiés. Le Cooker accepte ou refuse dans Messages.',
       'Une fois l’échange accepté, l’adresse exacte devient visible : coordonnez l’heure dans le chat, puis confirmez « J’ai récupéré » et laissez un avis.',
     ],
   },
   {
     icon: 'shield-checkmark-outline',
-    title: 'Allergies : comment êtes-vous protégé ?',
+    title: 'Préférences et allergies : comment ça marche ?',
     body: [
       'Vos allergies sont vérifiées sur nos serveurs : un plat qui contient (ou peut contenir, pour une allergie) l’un de vos allergènes n’apparaît jamais dans votre fil ni sur la carte.',
       'Chaque Cooker valide lui-même la liste des ingrédients et des allergènes avant publication. L’IA ne fait que proposer.',
@@ -65,10 +67,10 @@ export default function Help() {
   const [open, setOpen] = useState<number | null>(1);
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <ScreenHeader title="Aide et sécurité" />
+      <ScreenHeader title={t('Aide et sécurité')} />
       <ScrollView contentContainerStyle={{ padding: spacing.xl, paddingTop: spacing.sm, gap: spacing.md, paddingBottom: insets.bottom + spacing.huge }}>
-        {TOPICS.map((t, i) => (
-          <View key={t.title} style={styles.topic}>
+        {TOPICS.map((topic, i) => (
+          <View key={topic.title} style={styles.topic}>
             <Pressable
               onPress={() => setOpen(open === i ? null : i)}
               style={styles.topicHead}
@@ -76,17 +78,17 @@ export default function Help() {
               accessibilityState={{ expanded: open === i }}
             >
               <View style={styles.icon}>
-                <Ionicons name={t.icon} size={18} color={colors.forest} />
+                <Ionicons name={topic.icon} size={18} color={colors.forest} />
               </View>
-              <Text style={[type.h3, { flex: 1 }]}>{t.title}</Text>
+              <Text style={[type.h3, { flex: 1 }]}>{t(topic.title)}</Text>
               <Ionicons name={open === i ? 'chevron-up' : 'chevron-down'} size={18} color={colors.muted} />
             </Pressable>
             {open === i && (
               <View style={{ gap: spacing.sm, paddingTop: spacing.sm }}>
-                {t.body.map((b) => (
+                {topic.body.map((b) => (
                   <View key={b} style={{ flexDirection: 'row', gap: spacing.sm }}>
                     <Text style={type.body}>•</Text>
-                    <Text style={[type.body, { flex: 1 }]}>{b}</Text>
+                    <Text style={[type.body, { flex: 1 }]}>{t(b)}</Text>
                   </View>
                 ))}
               </View>
@@ -95,10 +97,10 @@ export default function Help() {
         ))}
         <View style={styles.emergency}>
           <Ionicons name="call" size={20} color={colors.danger} />
-          <Text style={[type.bodyStrong, { flex: 1, color: colors.danger }]}>Urgence : 911 · Info-Santé : 811</Text>
+          <Text style={[type.bodyStrong, { flex: 1, color: colors.danger }]}>{t('Urgence : 911 · Info-Santé : 811')}</Text>
           <Button title="811" size="md" variant="danger" onPress={() => Linking.openURL('tel:811')} />
         </View>
-        <Button title="Donner mon avis sur la bêta" variant="secondary" icon="chatbox-ellipses-outline" onPress={() => router.push('/feedback')} />
+        <Button title={t('Donner mon avis sur la bêta')} variant="secondary" icon="chatbox-ellipses-outline" onPress={() => router.push('/feedback')} />
       </ScrollView>
     </View>
   );

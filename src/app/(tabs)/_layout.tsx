@@ -3,6 +3,7 @@ import { Tabs } from 'expo-router';
 import React from 'react';
 import { ColorValue, Platform, StyleSheet, View } from 'react-native';
 import { useSessionSync } from '@/lib/useSessionSync';
+import { t } from '@/i18n';
 import { useApp } from '@/store/app';
 import { colors, fonts, radius, shadow } from '@/theme';
 
@@ -40,12 +41,12 @@ export default function TabsLayout() {
         sceneStyle: { backgroundColor: colors.bg },
       }}
     >
-      <Tabs.Screen name="index" options={{ title: 'Découvrir', tabBarIcon: icon('restaurant', 'restaurant-outline') }} />
-      <Tabs.Screen name="map" options={{ title: 'Carte', tabBarIcon: icon('map', 'map-outline') }} />
+      <Tabs.Screen name="index" options={{ title: t('Découvrir'), tabBarIcon: icon('restaurant', 'restaurant-outline') }} />
+      <Tabs.Screen name="map" options={{ title: t('Carte'), tabBarIcon: icon('map', 'map-outline') }} />
       <Tabs.Screen
         name="publish"
         options={{
-          title: 'Publier',
+          title: t('Publier'),
           tabBarIcon: () => (
             <View style={styles.fab}>
               <Ionicons name="camera" size={24} color={colors.onDark} />
@@ -57,13 +58,13 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="inbox"
         options={{
-          title: 'Messages',
+          title: t('Messages'),
           tabBarIcon: icon('chatbubbles', 'chatbubbles-outline'),
           tabBarBadge: unread > 0 ? (unread > 9 ? '9+' : unread) : undefined,
           tabBarBadgeStyle: { backgroundColor: colors.tomato },
         }}
       />
-      <Tabs.Screen name="profile" options={{ title: 'Profil', tabBarIcon: icon('person-circle', 'person-circle-outline') }} />
+      <Tabs.Screen name="profile" options={{ title: t('Profil'), tabBarIcon: icon('person-circle', 'person-circle-outline') }} />
     </Tabs>
   );
 }
