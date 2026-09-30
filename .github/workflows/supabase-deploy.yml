@@ -96,10 +96,5 @@ jobs:
 
       - name: Test de bout en bout sur le serveur réel (compte temporaire, supprimé ensuite)
         if: ${{ !inputs.dry_run }}
-        run: |
-          sudo apt-get install -y -qq imagemagick > /dev/null
-          # Étiquette de test : l'IA doit y lire lait, œufs, blé (⇒ gluten) et la mention « Peut contenir : noix ».
-          convert -size 1400x700 -background white -fill black -pointsize 44 \
-            caption:"BISCUITS SABLÉS AU BEURRE\n\nIngrédients : farine de blé, beurre, sucre, œufs, lait écrémé en poudre, sel.\n\nContient : blé, lait, œufs.\nPeut contenir : noix." \
-            etiquette.png
-          node scripts/supabase-deploy.mjs smoke etiquette.png
+        # Étiquette de test (scripts/fixtures) : l'IA doit y lire lait, œufs, blé (⇒ gluten) et « Peut contenir : noix ».
+        run: node scripts/supabase-deploy.mjs smoke scripts/fixtures/etiquette-test.png
