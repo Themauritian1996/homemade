@@ -191,6 +191,16 @@ async function smoke(imagePath) {
   };
   const admin = (method, p, body) => http(method, p, { token: service, body, headers: { apikey: service } });
 
+  // Restes d'un test précédent interrompu (comptes robot-test-…@homemade-test.invalid) : supprimés d'abord.
+  const leftovers = await sql(`select id from auth.users where email like '%robot-test-%@homemade-test.invalid'`).catch(() => []);
+  for (const u of leftovers ?? []) {
+    await sql(
+      `delete from public.meals where cooker_id = '${u.id}'; delete from public.beta_invites where created_by = '${u.id}'; delete from public.beta_feedback where user_id = '${u.id}'; delete from public.ai_analyses where user_id = '${u.id}';`,
+    ).catch(() => {});
+    const d = await admin('DELETE', `/auth/v1/admin/users/${u.id}`);
+    console.log(`Ancien compte de test ${u.id} : suppression HTTP ${d.status}${d.status === 200 ? '' : ' — ' + d.text.slice(0, 300)}`);
+  }
+
   const code = `ROBOT-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
   const email = `robot-test-${Date.now()}@homemade-test.invalid`;
   let userId = null;
@@ -238,6 +248,9 @@ async function smoke(imagePath) {
       }
       const meal = await as('POST', '/functions/v1/analyze-meal', { body: { photo_path: photo, task: 'meal' } });
       step(meal.status === 200 && typeof meal.json?.analysis?.isFood === 'boolean', 'IA gratuite : analyse de photo de plat', meal.json?.analysis?.modelVersion ?? meal.text.slice(0, 200));
+      // Détail des erreurs d'IA (journal ai_analyses) : indispensable pour comprendre un refus du fournisseur.
+      const errs = await sql(`select task, status, provider, model, error from public.ai_analyses where user_id = '${userId}' and status <> 'ok' order by created_at`);
+      for (const r of errs ?? []) console.log(`    journal IA [${r.task}] ${r.status} ${r.provider}/${r.model} : ${r.error ?? ''}`);
     }
 
     const pub = await as('POST', '/rest/v1/rpc/publish_meal', {
@@ -269,8 +282,9 @@ async function smoke(imagePath) {
       await sql(
         `delete from public.beta_invites where created_by = '${userId}'; delete from public.beta_feedback where user_id = '${userId}'; delete from public.ai_analyses where user_id = '${userId}';`,
       ).catch(() => {});
+      await sql(`delete from public.meals where cooker_id = '${userId}';`).catch((e) => console.log(`    (nettoyage plats : ${e.message})`));
       const del = await admin('DELETE', `/auth/v1/admin/users/${userId}`);
-      step(del.status === 200, 'Nettoyage : compte de test supprimé', `HTTP ${del.status}`);
+      step(del.status === 200, 'Nettoyage : compte de test supprimé', `HTTP ${del.status}${del.status === 200 ? '' : ' — ' + del.text.slice(0, 300)}`);
     }
     await sql(`delete from public.beta_invites where code = '${code}'`).catch(() => {});
   }
