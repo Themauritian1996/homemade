@@ -21,7 +21,7 @@ flowchart LR
   end
 
   subgraph Externes["Services externes"]
-    CLAUDE[Anthropic API<br/>Claude — vision + JSON structuré]
+    CLAUDE[IA vision gratuite<br/>Gemini · secours Groq — JSON structuré]
     STRIPE[Stripe Connect<br/>Express · capture manuelle]
     MAPS[OpenStreetMap · CARTO<br/>tuiles sans clé]
     PUSH[Expo Push]
@@ -52,7 +52,7 @@ flowchart LR
 | Front-end | **React Native + Expo SDK 57**, Expo Router, TypeScript strict | Un seul code Android/iOS, OTA updates (EAS Update), écosystème mature. Compatible Expo Go pour le prototypage (mode démo). |
 | Back-end / BaaS | **Supabase** (plutôt que Firebase) | Le cœur du produit est **relationnel et géographique** : croiser allergènes × ingrédients × profils, filtrer par distance, noter dans les deux sens. Postgres + PostGIS le fait **dans une seule requête côté serveur** avec des garanties transactionnelles. Firestore n'a ni jointure, ni requête « ne contient aucun de », ni géo-requête native : le filtrage allergènes devrait se faire côté client — inacceptable pour la sécurité. La RLS de Postgres donne une autorisation au niveau ligne *et* colonne. |
 | Comptes | **Supabase Auth** | Courriel/mot de passe dès le MVP, Google et Apple Sign-In en phase 2 (Apple obligatoire sur iOS si un autre login social est offert). Le trigger `handle_new_user` crée profil, données privées et réglages. |
-| IA visuelle | **Claude (Anthropic API) — `claude-opus-5`** via Edge Function | Voir comparatif ci-dessous. |
+| IA visuelle | **Gemini (offre gratuite)**, secours **Groq** (gratuit), Claude en option payante — via Edge Function | Voir comparatif ci-dessous. |
 | Paiement | **Stripe Connect Express** + PaymentSheet | Marketplace à deux côtés : Stripe gère le KYC des Cookers, les virements, les litiges. *Destination charges* + `application_fee_amount` pour la commission. **Capture manuelle** : l'Eater est pré-autorisé à la commande, débité à la cueillette. |
 | Carte | **Leaflet + OpenStreetMap** (fond CARTO Voyager) dans une WebView (`react-native-webview`) | **Aucune clé ni facturation** (Google Maps exige une clé dans l'APK) ; même rendu dans Expo Go, l'APK et l'aperçu web ; pastilles de prix en HTML, sélecteur de point de cueillette. Leaflet est chargé depuis le CDN avec empreinte SRI ; hors ligne, repli automatique sur la liste par distance. |
 | Temps réel | **Supabase Realtime** | Chat et suivi de commande sans serveur WebSocket à maintenir ; la RLS filtre les événements. |
@@ -65,7 +65,7 @@ flowchart LR
 | Modèles spécialisés (Clarifai Food, LogMeal, Passio) | Reconnaissance de plats, parfois nutrition | Catalogues orientés restauration/US, peu de raisonnement « recette maison », intégration et coût par appel variables, français limité. | ⚠️ Possible en complément |
 | **LLM multimodal (Claude, GPT, Gemini)** | Identifie le plat, **déduit les ingrédients non visibles** d'après la recette typique, raisonne sur les allergènes, répond en français, **sortie JSON contrainte par un schéma** | Coût par appel plus élevé qu'une API de labels ; latence de quelques secondes. | ✅ **Recommandé** |
 
-**Recommandation : un LLM multimodal appelé côté serveur, avec sortie structurée.** L'implémentation utilise **Claude** (`claude-opus-5`, SDK officiel `@anthropic-ai/sdk`) :
+**Recommandation : un LLM multimodal appelé côté serveur, avec sortie structurée.** Pendant la bêta, l'app utilise des **offres gratuites** : Gemini (Google AI Studio), puis Groq en secours (`supabase/functions/analyze-meal/providers.ts`, même schéma JSON, même nettoyage fail-closed). Claude reste possible en ajoutant simplement `ANTHROPIC_API_KEY`. Implémentation Claude historique : (`claude-opus-5`, SDK officiel `@anthropic-ai/sdk`) :
 
 - **Sorties structurées** (`output_config.format` + JSON Schema) : les codes d'allergènes sont une énumération fermée — le modèle ne peut pas inventer un code.
 - **Raisonnement adaptatif** (`thinking: adaptive`) et effort réglable (`AI_EFFORT`) pour arbitrer latence / rigueur.
@@ -82,7 +82,7 @@ sequenceDiagram
   participant App
   participant ST as Storage
   participant AM as Edge: analyze-meal
-  participant AI as Claude
+  participant AI as IA (Gemini/Groq)
   participant DB as Postgres
   C->>App: Photo du plat
   App->>App: Redimensionne 1280 px, JPEG 70 % (EXIF supprimé)

@@ -1,6 +1,6 @@
 // Contrat de l'analyse IA. Toute modification du prompt ou du schéma ⇒ incrémenter PROMPT_VERSION
 // (stocké dans ai_analyses pour comparer les versions sur les données réelles).
-export const PROMPT_VERSION = '2026-09-29.1'; // + lecture d'étiquettes et de recettes (OCR) ; lexique bilingue (étiquettes canadiennes)
+export const PROMPT_VERSION = '2026-09-30.1'; // fournisseurs gratuits (Gemini, Groq) : consigne JSON + schéma ajoutés au prompt hors Claude
 
 // Doit rester synchronisé avec supabase/seed.sql et src/data/allergens.ts.
 export const ALLERGEN_CODES = [

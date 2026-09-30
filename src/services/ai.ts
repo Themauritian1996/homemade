@@ -4,7 +4,7 @@
  *   2. uploadMealPhoto()  : envoi dans Storage (indépendant de l'IA : la photo n'est jamais perdue)
  *   3. analyzeMealPhoto() : pré-remplissage selon EXPO_PUBLIC_AI_PROVIDER
  *        - local  → Qwen3-VL sur le PC via Ollama (développement, gratuit) — voir localAi.ts
- *        - server → Edge Function `analyze-meal` (Claude ; la clé ne quitte jamais le serveur)
+ *        - server → Edge Function `analyze-meal` (IA gratuite Gemini/Groq ; les clés ne quittent jamais le serveur)
  *        - none   → pas d'IA : saisie manuelle
  *      Mode démo (sans backend) : analyse simulée.
  *
@@ -57,7 +57,7 @@ let serverProbe: Promise<boolean> | null = null;
 
 /**
  * L'IA pré-remplit-elle l'annonce dans cet environnement ?
- * Pour Claude (server), on interroge une fois l'Edge Function : si elle n'est pas déployée ou n'a pas de clé,
+ * Pour l'IA en ligne (server), on interroge une fois l'Edge Function : si elle n'est pas déployée ou n'a pas de clé,
  * l'app passe directement en saisie manuelle au lieu d'afficher une erreur à chaque photo.
  */
 export async function aiAvailable(): Promise<boolean> {
@@ -76,7 +76,7 @@ export async function aiAvailable(): Promise<boolean> {
 export function aiProviderLabel(): string {
   if (DEMO_MODE) return 'Simulée (mode démo)';
   if (localAiAvailable()) return `Locale · ${config.localAiModel}`;
-  if (config.aiProvider === 'server') return 'Claude (Anthropic) · serveur';
+  if (config.aiProvider === 'server') return 'En ligne · Gemini (gratuit)';
   return 'Désactivée · saisie manuelle';
 }
 

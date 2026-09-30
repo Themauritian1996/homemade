@@ -67,7 +67,7 @@ const DOCS: Record<string, { title: string; sections: [string, string][] }> = {
       ],
       [
         'Intelligence artificielle',
-        "Si vous utilisez l'analyse de photo ou la lecture d'étiquette, la photo est transmise à notre fournisseur d'IA (Anthropic, États-Unis) pour produire une suggestion. Elle ne sert pas à entraîner ses modèles. Vous pouvez toujours remplir l'annonce à la main.",
+        "Si vous utilisez l'analyse de photo ou la lecture d'étiquette, la photo (et elle seule, jamais votre profil santé) est transmise à un fournisseur d'IA situé aux États-Unis — Google (Gemini) ou, en secours, Groq — pour produire une suggestion. Pendant la bêta, nous utilisons leurs offres gratuites, dont les données peuvent servir à améliorer leurs services : ne photographiez ni visage, ni document personnel. Vous pouvez toujours remplir l'annonce à la main.",
       ],
       [
         'Hébergement',

@@ -26,6 +26,8 @@ export interface InviteStatus {
 export async function checkInviteCode(code: string): Promise<InviteStatus> {
   if (DEMO_MODE) return { required: false, valid: true };
   const { data, error } = await requireSupabase().rpc('invite_status', { p_code: code });
+  // Base pas encore mise à jour (fonction absente) : le serveur décidera seul à la création du compte.
+  if (error?.code === 'PGRST202') return { required: false, valid: true };
   if (error) throw error;
   return data as InviteStatus;
 }

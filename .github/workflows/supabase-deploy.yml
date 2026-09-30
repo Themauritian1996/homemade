@@ -1,0 +1,82 @@
+# Met à jour le serveur Supabase SANS terminal : base de données (migrations), clés d'IA gratuites, Edge Functions.
+# Déclenchement : à chaque mise à jour de main qui touche supabase/, ou à la main
+# (onglet Actions → « Serveur Supabase » → Run workflow).
+#
+# À configurer UNE fois dans GitHub → Settings → Secrets and variables → Actions :
+#   Secrets   : SUPABASE_ACCESS_TOKEN (supabase.com/dashboard/account/tokens)
+#               SUPABASE_DB_PASSWORD  (mot de passe de la base, Project Settings → Database)
+#               GEMINI_API_KEY        (aistudio.google.com/apikey — gratuit)
+#               GROQ_API_KEY          (facultatif, console.groq.com/keys — gratuit, secours)
+#   Variable  : EXPO_PUBLIC_SUPABASE_URL (déjà utilisée par l'APK : l'identifiant du projet en est déduit)
+name: Serveur Supabase
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/**'
+      - '.github/workflows/supabase-deploy.yml'
+
+concurrency:
+  group: supabase-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_URL_VAR: ${{ vars.EXPO_PUBLIC_SUPABASE_URL }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      AI_CUSTOM_URL: ${{ secrets.AI_CUSTOM_URL }}
+      AI_CUSTOM_MODEL: ${{ secrets.AI_CUSTOM_MODEL }}
+      AI_CUSTOM_KEY: ${{ secrets.AI_CUSTOM_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Vérification de la configuration
+        id: cfg
+        run: |
+          missing=""
+          [ -n "$SUPABASE_ACCESS_TOKEN" ] || missing="$missing SUPABASE_ACCESS_TOKEN"
+          [ -n "$SUPABASE_DB_PASSWORD" ] || missing="$missing SUPABASE_DB_PASSWORD"
+          [ -n "$SUPABASE_URL_VAR" ] || missing="$missing EXPO_PUBLIC_SUPABASE_URL(variable)"
+          if [ -n "$missing" ]; then
+            echo "::error::Configuration manquante :$missing — voir GUIDE-UTILISATION.md, Étape 2."
+            exit 1
+          fi
+          ref=$(echo "$SUPABASE_URL_VAR" | sed -E 's#^https?://([^.]+)\.supabase\.co.*#\1#')
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+          echo "Projet Supabase : $ref"
+          [ -n "$GEMINI_API_KEY$GROQ_API_KEY$AI_CUSTOM_URL" ] || echo "::warning::Aucune clé d'IA gratuite (GEMINI_API_KEY…) : l'app fonctionnera en saisie manuelle."
+
+      - name: Liaison au projet
+        run: supabase link --project-ref "${{ steps.cfg.outputs.ref }}"
+
+      - name: Base de données (nouvelles migrations seulement)
+        # « y » répond à la confirmation de la CLI (aucune donnée n'est effacée : migrations additives).
+        run: echo y | supabase db push
+
+      - name: Clés d'IA (secrets serveur, jamais dans l'app)
+        run: |
+          args=()
+          for name in GEMINI_API_KEY GROQ_API_KEY AI_CUSTOM_URL AI_CUSTOM_MODEL AI_CUSTOM_KEY; do
+            value="${!name}"
+            if [ -n "$value" ]; then args+=("$name=$value"); fi
+          done
+          if [ ${#args[@]} -gt 0 ]; then
+            supabase secrets set --project-ref "${{ steps.cfg.outputs.ref }}" "${args[@]}"
+          else
+            echo "Aucune clé à enregistrer."
+          fi
+
+      - name: Fonction d'analyse IA
+        run: supabase functions deploy analyze-meal --project-ref "${{ steps.cfg.outputs.ref }}"

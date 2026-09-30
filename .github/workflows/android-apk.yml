@@ -33,8 +33,9 @@ jobs:
       # `analyze-meal` (photo du plat + lecture d'étiquettes). Si la fonction n'est pas déployée, l'app le détecte
       # et passe en saisie manuelle. Mettre la variable à `none` pour désactiver l'IA.
       EXPO_PUBLIC_AI_PROVIDER: ${{ vars.EXPO_PUBLIC_AI_PROVIDER || 'server' }}
-      # Facultatif : lien PUBLIC de téléchargement de l'APK (ex. Google Drive), ajouté aux invitations partagées.
-      EXPO_PUBLIC_BETA_DOWNLOAD_URL: ${{ vars.EXPO_PUBLIC_BETA_DOWNLOAD_URL }}
+      # Lien de téléchargement ajouté aux invitations partagées depuis l'app : toujours la dernière version.
+      # (Dépôt de téléchargement public si PUBLIC_RELEASES_REPO est défini, sinon ce dépôt-ci.)
+      EXPO_PUBLIC_BETA_DOWNLOAD_URL: ${{ vars.EXPO_PUBLIC_BETA_DOWNLOAD_URL || format('https://github.com/{0}/releases/latest/download/Homemade.apk', vars.PUBLIC_RELEASES_REPO || github.repository) }}
       # La carte (Leaflet + OpenStreetMap) ne demande aucune clé.
       NODE_OPTIONS: --max-old-space-size=4096
     steps:
@@ -70,6 +71,8 @@ jobs:
         run: |
           NAME="Homemade-test-${GITHUB_RUN_NUMBER}.apk"
           cp android/app/build/outputs/apk/release/app-release.apk "$NAME"
+          # Copie au nom FIXE : https://github.com/<dépôt>/releases/latest/download/Homemade.apk pointe toujours vers la dernière version.
+          cp "$NAME" Homemade.apk
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
           ls -lh "$NAME"
 
@@ -79,13 +82,44 @@ jobs:
           path: ${{ steps.apk.outputs.name }}
           retention-days: 14
 
-      - name: Publication dans Releases
+      - name: Notes de version (pour les testeurs)
+        run: |
+          cat > notes.md <<NOTES
+          ## 📲 Installer Homemade (Android)
+          1. Sur le téléphone, touche **Homemade.apk** ci-dessous pour le télécharger.
+          2. Ouvre le fichier. Si Android bloque : **Paramètres → Autoriser cette source**, puis reviens.
+          3. **Installer**. Si Play Protect avertit : **Plus de détails → Installer quand même** (app de test hors Play Store).
+          4. Ouvre l'app → **Créer un compte** → entre le **code d'invitation** reçu.
+
+          Mise à jour : installe simplement la nouvelle version par-dessus, ton compte est conservé.
+
+          _Version de test n°${GITHUB_RUN_NUMBER} · ${GITHUB_SHA::7}_
+          NOTES
+
+      - name: Publication dans Releases (ce dépôt)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "apk-${GITHUB_RUN_NUMBER}" "${{ steps.apk.outputs.name }}" \
-            --title "Homemade — APK de test n°${GITHUB_RUN_NUMBER}" \
-            --notes "APK de TEST (signé avec la clé de débogage, ne pas distribuer au public).
-          Installation : ouvrir ce lien sur le téléphone Android, télécharger le fichier .apk, puis l'ouvrir.
-          Commit : ${GITHUB_SHA::7}" \
+          gh release create "apk-${GITHUB_RUN_NUMBER}" Homemade.apk "${{ steps.apk.outputs.name }}" \
+            --title "Homemade — version de test n°${GITHUB_RUN_NUMBER}" \
+            --notes-file notes.md \
             --latest
+
+      # Facultatif : garder le code PRIVÉ et publier l'APK dans un petit dépôt PUBLIC, accessible à tous tes testeurs.
+      # Variable PUBLIC_RELEASES_REPO (ex. Themauritian1996/homemade-app) + secret PUBLIC_RELEASES_TOKEN (voir le guide).
+      - name: Publication publique (dépôt de téléchargement)
+        if: ${{ vars.PUBLIC_RELEASES_REPO != '' }}
+        env:
+          GH_TOKEN: ${{ secrets.PUBLIC_RELEASES_TOKEN }}
+          PUBLIC_REPO: ${{ vars.PUBLIC_RELEASES_REPO }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error::Secret PUBLIC_RELEASES_TOKEN manquant : voir GUIDE-UTILISATION.md, Étape 4 (option B)."
+            exit 1
+          fi
+          gh release create "apk-${GITHUB_RUN_NUMBER}" Homemade.apk \
+            --repo "$PUBLIC_REPO" \
+            --title "Homemade — version de test n°${GITHUB_RUN_NUMBER}" \
+            --notes-file notes.md \
+            --latest
+          echo "Lien pour tes testeurs : https://github.com/$PUBLIC_REPO/releases/latest/download/Homemade.apk"

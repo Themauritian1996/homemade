@@ -3,7 +3,7 @@
  *
  * L'app appelle `http://<ip-du-PC>:8081/local-ai` : la route API src/app/local-ai+api.ts relaie vers Ollama.
  * Aucun secret, aucune donnée hors du réseau local. Mêmes prompts, mêmes schémas JSON et même nettoyage
- * que l'Edge Function Claude (source unique : supabase/functions/analyze-meal/prompt.ts).
+ * que l'Edge Function en ligne (source unique : supabase/functions/analyze-meal/prompt.ts).
  *
  * Les lignes maîtresses restent respectées : l'IA ne fait que PRÉ-REMPLIR ; le Cooker atteste et
  * `publish_meal` recalcule les allergènes côté serveur.
@@ -47,7 +47,7 @@ async function callLocalModel(system: string, schema: object, instruction: strin
         model: config.localAiModel,
         stream: false,
         think: false,
-        format: schema, // même structure que Claude, avec des tailles bornées pour les petits modèles
+        format: schema, // même structure que l'IA en ligne, avec des tailles bornées pour les petits modèles
         keep_alive: '30m',
         options: { temperature: 0, num_predict: numPredict, num_ctx: 4096 },
         messages: [

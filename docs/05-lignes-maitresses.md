@@ -11,7 +11,7 @@ Le document à relire avant chaque décision produit ou technique. Si une demand
 2. **L'IA propose, l'humain valide, le serveur décide.** Aucun plat n'est visible sans attestation horodatée du Cooker (contrainte SQL `meals_published_requires_confirmation`).
 3. **Fail-closed.** En cas de doute (faible confiance, donnée manquante, erreur), on **exclut** ou on **conserve l'allergène**, jamais l'inverse. Les sources d'allergènes s'additionnent, elles ne se soustraient pas.
 4. **L'IA n'est jamais un point de blocage.** Panne, quota ou refus → saisie manuelle dans le même formulaire.
-5. **Aucun secret dans l'app.** Clés Anthropic, Stripe secrète et *service role* : Edge Functions uniquement. Seules les variables `EXPO_PUBLIC_*` (non secrètes) vont dans le bundle.
+5. **Aucun secret dans l'app.** Clés d'IA (Gemini, Groq, Anthropic), Stripe secrète et *service role* : Edge Functions uniquement. Seules les variables `EXPO_PUBLIC_*` (non secrètes) vont dans le bundle.
 6. **Écritures critiques via RPC uniquement** (`meals`, `meal_allergens`, `orders`, `reviews`). RLS sur toutes les tables, privilèges par colonne pour les champs sensibles.
 7. **Vie privée par défaut.** Adresse exacte révélée seulement après acceptation d'une commande ; position publique brouillée (100-300 m) ; données santé = renseignements sensibles (Loi 25) : consentement explicite, minimisation, hébergement au Canada.
 8. **L'argent suit la remise du plat.** Pré-autorisation à la commande, **capture à la cueillette**, annulation gratuite avant acceptation.
@@ -34,7 +34,7 @@ Le document à relire avant chaque décision produit ou technique. Si une demand
 | Fenêtre pour laisser un avis | 14 jours | `submit_review` |
 | Seuil IA « à vérifier » | confiance < 0,6 | `LOW_CONFIDENCE` (publish.tsx) |
 | Quota IA | 20 analyses / h / utilisateur | `AI_MAX_PER_HOUR` |
-| Modèle IA / effort (production) | `claude-opus-5` / `medium` | `AI_MODEL`, `AI_EFFORT` |
+| IA en ligne (bêta, gratuite) | Gemini `gemini-flash-latest` (Google AI Studio, offre gratuite) → secours Groq `llama-4-scout` (gratuit) → service compatible OpenAI facultatif ; Claude seulement si `ANTHROPIC_API_KEY` est défini (payant, dernier recours) | `AI_PROVIDERS`, `GEMINI_MODEL`, `GROQ_MODEL` (secrets Supabase) |
 | Modèle IA local (développement, gratuit) | `qwen3-vl:2b-instruct` via Ollama (≈ 12 s, RTX 3050) ; `4b-instruct` plus précis (≈ 75 s) | `EXPO_PUBLIC_AI_PROVIDER=local`, `EXPO_PUBLIC_LOCAL_AI_MODEL` |
 | Photo envoyée à l'IA | 1280 px, JPEG 70 % (plat) · 1600 px, JPEG 80 % (étiquette/recette) | `preparePhoto()`, `prepareTextPhoto()` |
 | Inscription | Sur code d'invitation pendant la bêta (défaut : exigé) | `app_config.invite_required` |
