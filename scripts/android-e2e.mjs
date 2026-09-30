@@ -122,6 +122,22 @@ const hideKeyboard = () => {
 };
 
 try {
+  // L'écran d'accueil de l'émulateur (« Pixel Launcher ») se fige souvent sur les serveurs GitHub et ouvre une fenêtre
+  // « isn't responding » qui vole le clavier : on masque ces fenêtres et on désactive ce lanceur (inutile au test).
+  for (const args of [
+    ['shell', 'settings', 'put', 'global', 'anr_show_background', '0'],
+    ['shell', 'settings', 'put', 'secure', 'anr_show_background', '0'],
+    ['shell', 'pm', 'disable-user', '--user', '0', 'com.google.android.apps.nexuslauncher'],
+    ['shell', 'input', 'keyevent', 'KEYCODE_BACK'],
+  ]) {
+    try {
+      adb(...args);
+    } catch {
+      // réglage indisponible sur cette image : sans effet
+    }
+  }
+  await sleep(2000);
+
   // Installation et autorisations (position de Montréal simulée)
   adb('install', '-r', '-g', apk);
   step(true, 'APK installée');
