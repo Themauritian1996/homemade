@@ -30,22 +30,28 @@ export function PickupPicker({
   area,
   onAreaChange,
   onConfirmed,
+  hideArea,
+  autoLocate = true,
 }: {
   value: GeoPoint;
   onChange: (p: GeoPoint) => void;
-  area: string;
-  onAreaChange: (s: string) => void;
+  area?: string;
+  onAreaChange?: (s: string) => void;
   /** Appelé dès que le point reflète un vrai choix (position GPS ou épingle déplacée). */
   onConfirmed: () => void;
+  /** Sans champ « repère public » (ex. adresse privée dans les Paramètres). */
+  hideArea?: boolean;
+  /** Se placer d'emblée sur la position GPS (faux si une adresse enregistrée est déjà affichée). */
+  autoLocate?: boolean;
 }) {
   const mapRef = useRef<LeafletMapHandle>(null);
   const [mapFailed, setMapFailed] = useState(false);
   const [locating, setLocating] = useState(false);
-  const areaRef = useRef(area);
-  areaRef.current = area;
+  const areaRef = useRef(area ?? '');
+  areaRef.current = area ?? '';
 
   const fillArea = async (p: GeoPoint) => {
-    if (areaRef.current.trim()) return;
+    if (hideArea || !onAreaChange || areaRef.current.trim()) return;
     const n = await neighborhoodOf(p);
     if (n && !areaRef.current.trim()) onAreaChange(n);
   };
@@ -70,7 +76,7 @@ export function PickupPicker({
 
   // Position actuelle si la permission est déjà accordée (sans redemander).
   useEffect(() => {
-    useMyPosition(false);
+    if (autoLocate) useMyPosition(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -106,15 +112,19 @@ export function PickupPicker({
         loading={locating}
         onPress={() => useMyPosition(true)}
       />
-      <TextField
-        label={t('Zone affichée aux voisins')}
-        value={area}
-        onChangeText={onAreaChange}
-        placeholder={t('Ex. Plateau — près du parc Laurier')}
-        icon="location-outline"
-        maxLength={120}
-      />
-      <Text style={type.caption}>{t('Votre adresse exacte n\'est partagée qu\'après acceptation d\'une commande. Sur la carte publique, le point est décalé de 100 à 300 m.')}</Text>
+      {!hideArea && onAreaChange && (
+        <TextField
+          label={t('Repère public (facultatif)')}
+          value={area}
+          onChangeText={onAreaChange}
+          placeholder={t('Ex. près du parc Laurier (sans adresse)')}
+          icon="location-outline"
+          maxLength={60}
+        />
+      )}
+      <Text style={type.caption}>
+        {t('Vos voisins voient seulement votre zone postale (ex. H2J) et un point approximatif (100 à 300 m). L’adresse exacte est partagée après acceptation de la commande (et paiement pour un achat).')}
+      </Text>
     </View>
   );
 }

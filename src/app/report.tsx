@@ -18,6 +18,7 @@ const REASONS: { id: ReportReason; label: string; hint: string }[] = [
   { id: 'no_show', label: 'Absent au rendez-vous', hint: '' },
   { id: 'harassment', label: 'Comportement inapproprié', hint: '' },
   { id: 'fraud', label: 'Fraude ou arnaque', hint: '' },
+  { id: 'off_platform', label: 'Paiement demandé hors de l’app', hint: 'Interac, comptant… : interdit, le compte peut être suspendu.' },
   { id: 'other', label: 'Autre', hint: '' },
 ];
 

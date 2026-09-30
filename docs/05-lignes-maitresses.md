@@ -43,7 +43,10 @@ Le document à relire avant chaque décision produit ou technique. Si une demand
 | Langues | Français (défaut) · anglais, au choix de l'utilisateur | `src/i18n` (clé = texte français), `npm run test:i18n` |
 | Code de lancement bêta | `VOISINS2026`, 100 inscriptions | `beta_invites` (migration bêta) |
 | Invitations par membre | 5 | `my_invite_code` |
-| Carte | Leaflet 1.9.4 embarqué dans l'app + fond CARTO (repli : tuiles OpenStreetMap), sans clé | `src/lib/mapHtml.ts`, `src/lib/leafletInline.ts` |
+| Carte | Leaflet 1.9.4 embarqué dans l'app + fond OpenStreetMap standard (repli : Esri World Street Map), sans clé — CARTO exige désormais une clé | `src/lib/mapHtml.ts`, `src/lib/leafletInline.ts` |
+| Adresse du Cooker | Privée (`user_private`, illisible directement) ; publiquement : zone postale (3 caractères, ex. H2J) + point décalé ; révélée après acceptation (et paiement pour un achat) | `set_my_address`, `meals_public_zone`, `get_pickup_details` |
+| Anti-contournement | Téléphones, courriels, liens et paiements hors app masqués dans le chat (serveur) ; motif de signalement « off_platform » | `mask_off_platform` |
+| Paiements | Stripe Connect Express (mode test d'abord) ; webhooks créés par le robot de déploiement | secrets `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY` |
 | Objectif rappel allergènes IA | ≥ 98 % | jeu d'évaluation (docs/03) |
 | Objectif latence analyse | p95 < 8 s | idem |
 

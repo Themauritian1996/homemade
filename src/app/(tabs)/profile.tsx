@@ -1,16 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useState } from 'react';
-import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar, Badge, Card, Divider, ListRow } from '@/components/ui';
 import { allergenById } from '@/data/allergens';
-import { config, DEMO_MODE } from '@/lib/config';
+import { DEMO_MODE } from '@/lib/config';
 import { formatRating } from '@/lib/format';
 import { appVersion } from '@/services/account';
 import { signOut } from '@/services/auth';
-import { friendlyError } from '@/lib/errors';
-import { fetchMyProfile, startPayoutOnboarding } from '@/services/profile';
+import { fetchMyProfile } from '@/services/profile';
 import type { PublicProfile } from '@/types';
 import { useApp } from '@/store/app';
 import { colors, fonts, radius, shadow, spacing, type } from '@/theme';
@@ -18,7 +17,6 @@ import { colors, fonts, radius, shadow, spacing, type } from '@/theme';
 import { t, tr } from '@/i18n';
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
-const SALES_ENABLED = Boolean(config.stripePublishableKey);
 
 export default function Profile() {
   const insets = useSafeAreaInsets();
@@ -47,16 +45,6 @@ export default function Profile() {
       { text: t('Annuler'), style: 'cancel' },
       { text: t('Se déconnecter'), style: 'destructive', onPress: () => signOut() },
     ]);
-
-  const openPayouts = async () => {
-    try {
-      const url = await startPayoutOnboarding();
-      if (url) await Linking.openURL(url);
-      else Alert.alert(t('Mode démo'), t('Configurez Supabase et Stripe pour activer les paiements Cooker.'));
-    } catch (e) {
-      Alert.alert(t('Paiements indisponibles'), friendlyError(e, t('Réessayez plus tard.')));
-    }
-  };
 
   return (
     <ScrollView
@@ -111,12 +99,8 @@ export default function Profile() {
           subtitle={favorites.length ? t('{0} plat(s) mis de côté', { 0: favorites.length }) : t('Touchez ♡ sur un plat pour le retrouver ici')}
           onPress={() => router.push('/favorites')}
         />
-        {SALES_ENABLED && (
-          <>
-            <Divider />
-            <ListRow icon="card-outline" title={t('Recevoir des paiements')} subtitle={t('Activer la vente · virements Stripe')} onPress={openPayouts} />
-          </>
-        )}
+        <Divider />
+        <ListRow icon="card-outline" title={t('Paiements et adresse')} subtitle={t('Vendre, acheter, adresse de cueillette privée')} onPress={() => router.push('/settings')} />
       </Card>
 
       <Pressable onPress={() => router.push('/invite')} style={({ pressed }) => [styles.invite, pressed && { opacity: 0.9 }]}>

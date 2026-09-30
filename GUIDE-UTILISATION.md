@@ -72,6 +72,23 @@ Sans cette étape, l'inscription est immédiate mais **« Mot de passe oublié �
 
 4. Relance **Serveur Supabase** (étape 3). Dans le journal, l'étape « Réglages d'inscription et courriels » doit afficher **✓ Courriels activés**. Gmail permet environ 500 courriels par jour : largement assez.
 
+### 2-D. (Facultatif) Activer l'ACHAT avec Stripe — 15 min, 0 $ en mode test
+Sans cette étape, les plats s'**échangent** seulement. Avec elle, les Eaters peuvent **acheter** : le montant est pré-autorisé à la commande, débité **à la cueillette**, puis versé au Cooker (moins la commission). Commence en **mode test** : cartes fictives, aucun argent réel, idéal pour la bêta.
+1. Crée un compte gratuit : **https://dashboard.stripe.com/register** (courriel + mot de passe, aucune carte demandée).
+2. En haut à droite, vérifie que **« Mode test »** (Test mode) est **activé**.
+3. **Connect** (pour que les Cookers puissent recevoir de l'argent) : menu **Connect** → **Commencer / Get started** → choisis **« Plateforme ou place de marché »** → valide. Puis **Paramètres → Connect → Image de marque** : nom **Homemade**, couleur `#1F3A2E`.
+4. **Développeurs → Clés API** : copie la **clé publiable** (`pk_test_…`) et la **clé secrète** (`sk_test_…`, bouton « Révéler »).
+5. Dans GitHub (même page qu'en 2-B), ajoute deux secrets :
+
+| Name (exactement) | Valeur |
+|---|---|
+| `STRIPE_SECRET_KEY` | la clé secrète (`sk_test_…`) |
+| `STRIPE_PUBLISHABLE_KEY` | la clé publiable (`pk_test_…`) |
+
+6. Onglet **Actions** : lance **Serveur Supabase** (il crée tout seul les webhooks Stripe — journal : « ✓ Webhooks Stripe créés »), puis **APK Android** → **Run workflow**. La nouvelle APK propose **Vendre** et **Commander**.
+7. Test : un Cooker va dans **Profil → Paiements et adresse → Activer la vente** (en mode test, Stripe propose des données fictives : utilise « Utiliser des données de test » / numéro de téléphone `000 000 0000`, code `000000`). Un Eater commande avec la carte **4242 4242 4242 4242**, date future, code au choix.
+8. **Argent réel (plus tard)** : active ton compte Stripe (identité, compte bancaire), puis remplace les deux secrets par les clés **live** (`sk_live_…`, `pk_live_…`). ⚠️ Avant, vérifie avec un professionnel : MAPAQ, taxes (TPS/TVQ), assurance.
+
 ## Étape 3 — Lancer la mise à jour du serveur (2 min, puis 3 min d'attente)
 
 La nouvelle version est déjà dans la branche principale (`main`) : l'APK se fabrique tout seul (≈ 25 min, robot **APK Android**).
@@ -192,12 +209,15 @@ Quand je modifie l'app, une nouvelle version apparaît au même lien (**releases
 2. Si les codes par courriel sont activés (étape 2-C) : entre le **code à 6 chiffres** reçu par courriel.
 3. **Bienvenue à la table** : indique si tu veux un régime (végé, halal…) ou une allergie — facultatif. **Continuer**. Si l'app demande ta position, accepte : elle sert à trouver les plats près de toi.
 4. Tu restes connecté sur ton téléphone jusqu'à **Se déconnecter** ; ton courriel est pré-rempli à la connexion suivante, et Android propose d'enregistrer le mot de passe.
+5. **Profil → Paiements et adresse** : entre ton **adresse et ton code postal** (privés), touche **Trouver sur la carte**, vérifie l'épingle, **Enregistrer**. Tes plats seront placés là automatiquement. Tes voisins voient seulement ta **zone postale** (ex. `H2J`) et un point approximatif ; l'adresse exacte apparaît dans le chat de l'acheteur **seulement après ton acceptation** (et son paiement, pour un achat), avec un bouton **Itinéraire**.
+
+> 🔒 **Tout passe par l'app** : dans le chat, les numéros de téléphone, courriels, liens et demandes de paiement hors app (Interac, comptant…) sont **masqués automatiquement**. Un membre qui insiste peut être signalé (« Paiement demandé hors de l'app »).
 
 ### Les 5 onglets du bas
 | Onglet | À quoi il sert |
 |---|---|
 | 🍴 **Découvrir** | Les plats et **meal preps** autour de toi, avec une **barre de recherche** (plat, ingrédient, quartier) et des catégories (Meal prep, Bol santé, Déjeuner…). Tes préférences alimentaires sont appliquées automatiquement. |
-| 🗺️ **Carte** | Carte interactive (OpenStreetMap) : touche une pastille de prix pour voir le plat. Bouton ☰ pour la liste, ⚙️ pour filtrer, ➤ pour te localiser. |
+| 🗺️ **Carte** | Carte interactive (OpenStreetMap, sans clé) : touche une pastille de prix pour voir le plat. Touche la barre du haut pour **chercher une zone** (code postal comme `H2J`, quartier ou adresse). ☰ liste, ⚙️ filtres, ➤ ta position. |
 | 📷 **Publier** | Photographier ton plat. L'IA remplit l'annonce et peut **lire une étiquette ou une recette**. |
 | 💬 **Messages** | Discuter, accepter un échange, confirmer la récupération. Une pastille rouge indique les messages non lus. |
 | 👤 **Profil** | Notes, profil santé, **Mes plats**, **Mes favoris**, **Invitez vos voisins**, **Paramètres** (photo, quartier, rayon, données), **Aide**, **Donner mon avis**. |

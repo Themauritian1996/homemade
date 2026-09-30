@@ -16,6 +16,7 @@ import { colors, radius, shadow, spacing, type } from '@/theme';
 import type { Meal, Review } from '@/types';
 
 import { t, tr } from '@/i18n';
+import { SALES_ENABLED } from '@/services/payments';
 export default function MealDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
@@ -221,7 +222,7 @@ export default function MealDetail() {
                 onPress={() => router.push({ pathname: '/order/[id]', params: { id: meal.id, kind: 'swap' } })}
               />
             )}
-            {meal.mode !== 'swap' && (
+            {meal.mode !== 'swap' && SALES_ENABLED && (
               <Button
                 title={t('Commander')}
                 variant="accent"

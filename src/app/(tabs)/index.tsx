@@ -6,6 +6,7 @@ import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, Text
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FilterSheet } from '@/components/FilterSheet';
 import { MealCard } from '@/components/MealCard';
+import { ZoneSearch } from '@/components/ZoneSearch';
 import { Button, Chip, EmptyState, IconButton, SectionHeader } from '@/components/ui';
 import { CUISINES, cuisineById } from '@/data/allergens';
 import { t, tr } from '@/i18n';
@@ -37,6 +38,8 @@ export default function Discover() {
   const { user, filters, setFilters, health, unread, hasRealLocation, setLocation } = useApp();
   const [sheet, setSheet] = useState(false);
   const [query, setQuery] = useState('');
+  const [zoneOpen, setZoneOpen] = useState(false);
+  const [zone, setZone] = useState<string | null>(null);
   const count = activeFilterCount(filters);
 
   // Recherche plein texte locale sur le fil déjà filtré par le serveur (titre, cuisine, ingrédients, quartier, Cooker).
@@ -56,6 +59,7 @@ export default function Discover() {
       if (status !== 'granted') return;
       const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
       setLocation({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }, true);
+      setZone(null);
     } catch {
       // Localisation désactivée sur le téléphone : on garde la position par défaut.
     }
@@ -102,7 +106,15 @@ export default function Discover() {
         </Pressable>
       </View>
 
-      {!hasRealLocation && (
+      <Pressable style={styles.zoneRow} onPress={() => setZoneOpen(true)} accessibilityRole="button">
+        <Ionicons name="location-outline" size={16} color={colors.tomato} />
+        <Text style={[type.caption, { color: colors.ink, flex: 1 }]} numberOfLines={1}>
+          {zone ? t('Autour de {zone}', { zone }) : hasRealLocation ? t('Autour de ma position') : t('Autour de Montréal')}
+        </Text>
+        <Text style={{ fontFamily: fonts.semibold, color: colors.forest, fontSize: 13 }}>{t('Changer de zone')}</Text>
+      </Pressable>
+
+      {!hasRealLocation && !zone && (
         <Pressable style={styles.locationHint} onPress={locate} accessibilityRole="button">
           <Ionicons name="navigate-outline" size={18} color={colors.tomato} />
           <Text style={[type.caption, { flex: 1, color: colors.ink }]}>{t('Les plats sont affichés autour de Montréal. Touchez ici pour utiliser votre position.')}</Text>
@@ -197,6 +209,7 @@ export default function Discover() {
         }
       />
       <FilterSheet visible={sheet} value={filters} onClose={() => setSheet(false)} onApply={(f) => setFilters(f)} />
+      <ZoneSearch visible={zoneOpen} onClose={() => setZoneOpen(false)} onFound={(_, label) => setZone(label)} />
     </View>
   );
 }
@@ -233,6 +246,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     justifyContent: 'center',
   },
+  zoneRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: -spacing.sm, minHeight: 32 },
   filterCount: { color: colors.onDark, fontFamily: fonts.bold, fontSize: 12 },
   community: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.forest, padding: spacing.lg, borderRadius: radius.lg, ...shadow.card },
   communityBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },

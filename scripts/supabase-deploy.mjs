@@ -4,6 +4,7 @@
 //   node scripts/supabase-deploy.mjs migrate      applique les migrations manquantes (dans l'ordre) + référentiels (seed)
 //   node scripts/supabase-deploy.mjs auth         réglages d'inscription (courriels par Gmail si GMAIL_ADDRESS/GMAIL_APP_PASSWORD, sinon sans courriel)
 //   node scripts/supabase-deploy.mjs app-config   écrit l'URL et la clé PUBLIQUE du projet dans $GITHUB_ENV (pour l'APK)
+//   node scripts/supabase-deploy.mjs stripe        paiements : points d'accès webhook Stripe + secrets (si STRIPE_SECRET_KEY)
 //   node scripts/supabase-deploy.mjs robot-create  compte de test temporaire (test sur émulateur Android) → $GITHUB_ENV
 //   node scripts/supabase-deploy.mjs robot-delete  supprime ce compte et tout ce qu'il a créé
 // Variables : SUPABASE_ACCESS_TOKEN (secret), SUPABASE_PROJECT_REF (identifiant du projet, non secret).
@@ -208,6 +209,66 @@ async function appConfig() {
   console.log(`✓ App branchée sur ${url} (clé publique « ${pub.name} »).`);
 }
 
+// ─────────────────────────────────────────────── Paiements Stripe (facultatif)
+// Avec la seule clé secrète Stripe (sk_test_… ou sk_live_…), crée les deux points d'accès webhook (compte plateforme +
+// comptes connectés des Cooker) et enregistre leurs secrets de signature dans les secrets Supabase. Idempotent.
+const STRIPE_PLATFORM_EVENTS = ['payment_intent.amount_capturable_updated', 'payment_intent.succeeded', 'payment_intent.canceled', 'charge.dispute.created'];
+const STRIPE_CONNECT_EVENTS = ['account.updated'];
+
+async function stripeApi(method, route, params) {
+  const body = params ? new URLSearchParams(params) : undefined;
+  const res = await fetch(`https://api.stripe.com/v1${route}`, {
+    method,
+    headers: { Authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}`, ...(body ? { 'Content-Type': 'application/x-www-form-urlencoded' } : {}) },
+    body,
+  });
+  const json = await res.json().catch(() => ({}));
+  if (res.status >= 300) throw new Error(`Stripe ${method} ${route} : HTTP ${res.status} ${json?.error?.message ?? ''}`);
+  return json;
+}
+
+async function stripeSetup() {
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) {
+    console.log('Paiements : pas de clé STRIPE_SECRET_KEY → seul l’échange est proposé dans l’app (voir le guide pour activer l’achat).');
+    return;
+  }
+  const mode = key.startsWith('sk_live_') ? 'RÉEL (argent réel)' : 'TEST (cartes fictives, aucun argent réel)';
+  const account = await stripeApi('GET', '/account');
+  console.log(`Stripe : compte ${account.id} · mode ${mode}`);
+
+  const url = `https://${ref}.supabase.co/functions/v1/stripe-webhook`;
+  const existing = (await stripeApi('GET', '/webhook_endpoints?limit=100')).data.filter((e) => e.url === url);
+  const secrets = await api('GET', `/projects/${ref}/secrets`);
+  const hasSecret = Array.isArray(secrets.json) && secrets.json.some((x) => x.name === 'STRIPE_WEBHOOK_SECRET');
+  const complete = existing.some((e) => !e.connect) && existing.some((e) => e.connect);
+  if (complete && hasSecret) {
+    console.log('✓ Webhooks Stripe déjà en place.');
+  } else {
+    // Le secret de signature n'est lisible qu'à la création : on recrée proprement les deux points d'accès.
+    for (const e of existing) await stripeApi('DELETE', `/webhook_endpoints/${e.id}`);
+    const mk = async (events, connect) => {
+      const params = [['url', url], ['description', `Homemade (${connect ? 'comptes connectés' : 'plateforme'})`], ...events.map((ev) => ['enabled_events[]', ev])];
+      if (connect) params.push(['connect', 'true']);
+      return stripeApi('POST', '/webhook_endpoints', params);
+    };
+    const platform = await mk(STRIPE_PLATFORM_EVENTS, false);
+    const connect = await mk(STRIPE_CONNECT_EVENTS, true);
+    console.log(`::add-mask::${platform.secret}`);
+    console.log(`::add-mask::${connect.secret}`);
+    const r = await api('POST', `/projects/${ref}/secrets`, [{ name: 'STRIPE_WEBHOOK_SECRET', value: `${platform.secret},${connect.secret}` }]);
+    if (r.status >= 300) fail(`Secret webhook non enregistré (HTTP ${r.status}) : ${r.text.slice(0, 200)}`);
+    console.log('✓ Webhooks Stripe créés (plateforme + comptes connectés), secret enregistré.');
+  }
+  // Connect doit être activé une fois dans le tableau de bord Stripe (sinon les Cooker ne peuvent pas s'inscrire).
+  try {
+    await stripeApi('GET', '/accounts?limit=1');
+    console.log('✓ Stripe Connect disponible (inscription des Cooker possible).');
+  } catch (e) {
+    console.log(`::warning::Stripe Connect n'est pas encore activé : tableau de bord Stripe → Connect → « Commencer » (voir le guide). ${e.message}`);
+  }
+}
+
 // ─────────────────────────────────────────────── Compte robot (test de l'APK sur émulateur Android)
 async function serviceKey() {
   const keys = await api('GET', `/projects/${ref}/api-keys?reveal=true`);
@@ -378,6 +439,21 @@ async function smoke(imagePath) {
       for (const r of errs ?? []) console.log(`    journal IA [${r.task}] ${r.status} ${r.provider}/${r.model} : ${r.error ?? ''}`);
     }
 
+    // Retour du formulaire Stripe (page publique) et fonds de carte sans clé (ceux que l'app affiche).
+    const ret = await fetch(`${url}/functions/v1/stripe-return?to=done`).then(async (r) => ({ status: r.status, text: await r.text() })).catch((e) => ({ status: 0, text: String(e) }));
+    step(ret.status === 200 && ret.text.includes('homemade://settings'), 'Page de retour Stripe → app', `HTTP ${ret.status}`);
+    for (const [label, tile] of [
+      ['OpenStreetMap', 'https://tile.openstreetmap.org/14/4843/5850.png'],
+      ['Esri (secours)', 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/14/5850/4843'],
+    ]) {
+      const t = await fetch(tile, { headers: { 'User-Agent': 'HomemadeBeta/1.0 (+https://github.com/Themauritian1996/homemade)', Referer: 'https://homemade.app/' } }).catch(() => null);
+      const type = t?.headers.get('content-type') ?? '';
+      const size = t ? (await t.arrayBuffer()).byteLength : 0;
+      console.log(`${t?.status === 200 && type.startsWith('image/') && size > 2000 ? '✓' : '⚠'} Fond de carte ${label} : HTTP ${t?.status ?? 'réseau'} · ${type} · ${size} octets`);
+    }
+    const addr = await as('POST', '/rest/v1/rpc/set_my_address', { body: { p_address: '1 rue Test', p_postal_code: 'h2j1a1', p_lat: 45.5231, p_lng: -73.5817 } });
+    step(addr.status === 200 && addr.json?.zone === 'H2J', 'Adresse privée enregistrée (zone publique H2J)', `HTTP ${addr.status}`);
+
     const pub = await as('POST', '/rest/v1/rpc/publish_meal', {
       body: {
         p_payload: {
@@ -423,6 +499,7 @@ try {
   else if (command === 'migrate') await migrate();
   else if (command === 'auth') await auth();
   else if (command === 'app-config') await appConfig();
+  else if (command === 'stripe') await stripeSetup();
   else if (command === 'robot-create') await robotCreate();
   else if (command === 'robot-delete') await robotDelete();
   else fail(`Commande inconnue : ${command}`);

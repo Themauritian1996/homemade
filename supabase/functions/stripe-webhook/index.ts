@@ -9,12 +9,18 @@ Deno.serve(async (req) => {
   if (!signature) return json({ error: 'MISSING_SIGNATURE' }, 400);
 
   const body = await req.text();
-  let event: Stripe.Event;
-  try {
-    event = await stripe().webhooks.constructEventAsync(body, signature, env('STRIPE_WEBHOOK_SECRET'), undefined, cryptoProvider);
-  } catch (e) {
-    return json({ error: 'INVALID_SIGNATURE', message: e instanceof Error ? e.message : String(e) }, 400);
+  // Deux points d'accès Stripe (compte plateforme + comptes connectés), chacun avec son secret : « whsec_a,whsec_b ».
+  let event: Stripe.Event | null = null;
+  let lastError = '';
+  for (const secret of env('STRIPE_WEBHOOK_SECRET').split(',').map((x) => x.trim()).filter(Boolean)) {
+    try {
+      event = await stripe().webhooks.constructEventAsync(body, signature, secret, undefined, cryptoProvider);
+      break;
+    } catch (e) {
+      lastError = e instanceof Error ? e.message : String(e);
+    }
   }
+  if (!event) return json({ error: 'INVALID_SIGNATURE', message: lastError }, 400);
 
   const admin = adminClient();
   const { error: dupErr } = await admin.from('stripe_events').insert({ id: event.id, type: event.type, payload: event });

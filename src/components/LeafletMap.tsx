@@ -26,6 +26,8 @@ export const LeafletMap = forwardRef<LeafletMapHandle, LeafletMapProps>(function
         containerStyle={StyleSheet.absoluteFill}
         source={{ html, baseUrl: 'https://homemade.app/' }}
         originWhitelist={['*']}
+        // Politique d'OpenStreetMap : les requêtes de tuiles identifient l'application.
+        applicationNameForUserAgent="HomemadeBeta/1.0 (+https://github.com/Themauritian1996/homemade)"
         javaScriptEnabled
         domStorageEnabled
         setSupportMultipleWindows={false}
