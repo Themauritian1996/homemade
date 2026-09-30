@@ -27,7 +27,7 @@ Scanner le QR code avec **Expo Go** (Android) ou l'appareil photo (iOS). Sans va
 > Firebase a été écarté au profit de Supabase : le filtrage allergènes × ingrédients × distance exige des jointures et des requêtes géographiques côté serveur que Firestore ne fait pas nativement (voir [01-architecture.md](01-architecture.md)).
 
 ## C. Activer l'IA — gratuite (Gemini, secours Groq)
-**Sans terminal (recommandé)** : ranger les secrets `GEMINI_API_KEY` (et `GROQ_API_KEY`), `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD` dans GitHub ; le workflow **Serveur Supabase** (`.github/workflows/supabase-deploy.yml`) applique les migrations, enregistre les clés et déploie `analyze-meal` à chaque mise à jour de `main`. Pas à pas : [GUIDE-UTILISATION.md](../GUIDE-UTILISATION.md), Étapes 1 à 3.
+**Sans terminal (recommandé)** : ranger les secrets `GEMINI_API_KEY` (et `GROQ_API_KEY`) et `SUPABASE_ACCESS_TOKEN` dans GitHub ; le workflow **Serveur Supabase** (`.github/workflows/supabase-deploy.yml`, script `scripts/supabase-deploy.mjs`) applique par l'**API de gestion** les migrations manquantes (historique `supabase_migrations.schema_migrations`) et les référentiels, règle l'inscription (sans confirmation par courriel pendant la bêta), enregistre les clés et déploie `analyze-meal` à chaque mise à jour de `main`. Aucun mot de passe de base n'est requis. Projet par défaut : `lcpoxseqtabauemymlss` (Canada), modifiable par la variable `SUPABASE_PROJECT_REF` ; l'APK lit la même URL et la même clé publique. Pas à pas : [GUIDE-UTILISATION.md](../GUIDE-UTILISATION.md), Étapes 1 à 3.
 
 **En ligne de commande** :
 1. Clé gratuite sur <https://aistudio.google.com/apikey> (ne pas activer la facturation) ; facultatif : <https://console.groq.com/keys>.

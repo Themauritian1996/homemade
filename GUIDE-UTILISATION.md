@@ -23,7 +23,9 @@ Tout fonctionne **gratuitement** : la base de données (Supabase, offre gratuite
 
 Tu vas seulement **copier-coller des clés** dans des pages web. GitHub fait ensuite tout le travail technique : mettre à jour la base de données, installer l'IA et fabriquer l'APK.
 
-Obligatoire : **3 secrets** (`GEMINI_API_KEY`, `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD`). Facultatif : `GROQ_API_KEY`.
+Obligatoire : **2 secrets** (`GEMINI_API_KEY`, `SUPABASE_ACCESS_TOKEN`). Facultatif : `GROQ_API_KEY`.
+
+> Projet Supabase de l'app : **homemade** au Canada (`lcpoxseqtabauemymlss`). Le jeton doit être créé en étant connecté au compte Supabase qui possède ce projet.
 
 > 🔐 Les clés sont des mots de passe : ne les envoie à personne, ne les colle jamais dans un fichier du projet. On les range uniquement dans les **Secrets** de GitHub (Étape 2), qui sont chiffrés et invisibles.
 
@@ -45,11 +47,7 @@ Obligatoire : **3 secrets** (`GEMINI_API_KEY`, `SUPABASE_ACCESS_TOKEN`, `SUPABAS
 ### 2-A. Le jeton Supabase (pour que GitHub mette le serveur à jour)
 1. Va sur **https://supabase.com/dashboard/account/tokens** → **Generate new token** → nom : `github` → **Generate** → copie le jeton (`sbp_…`).
 
-### 2-B. Le mot de passe de la base de données
-1. Sur **https://supabase.com/dashboard**, ouvre ton projet Homemade → ⚙️ **Project Settings** → **Database**.
-2. Si tu ne connais plus le mot de passe : **Reset database password** → **Generate a password** → copie-le → **Reset password**. (Sans risque : l'app n'utilise pas ce mot de passe.)
-
-### 2-C. Tout coller dans GitHub
+### 2-B. Tout coller dans GitHub
 1. Va sur **https://github.com/Themauritian1996/homemade/settings/secrets/actions**.
 2. Pour chaque ligne du tableau : **New repository secret** → *Name* = le nom exact → *Secret* = la valeur → **Add secret**.
 
@@ -58,9 +56,8 @@ Obligatoire : **3 secrets** (`GEMINI_API_KEY`, `SUPABASE_ACCESS_TOKEN`, `SUPABAS
 | `GEMINI_API_KEY` | la clé Gemini (`AIza…`) |
 | `GROQ_API_KEY` | la clé Groq (`gsk_…`) — facultatif |
 | `SUPABASE_ACCESS_TOKEN` | le jeton Supabase (`sbp_…`) |
-| `SUPABASE_DB_PASSWORD` | le mot de passe de la base |
 
-3. Clique ensuite l'onglet **Variables** (même page) et vérifie que **`EXPO_PUBLIC_SUPABASE_URL`** et **`EXPO_PUBLIC_SUPABASE_ANON_KEY`** existent déjà (elles servent à l'APK depuis le début). S'il en manque une : Supabase → ⚙️ **Project Settings** → **API** → copie *Project URL* et la clé *anon / publishable*, puis **New repository variable**.
+3. Rien d'autre à configurer : le robot lit lui-même l'adresse et la clé **publique** du projet avec ce jeton, pour le serveur comme pour l'APK. (Le secret `SUPABASE_DB_PASSWORD`, s'il existe, n'est plus utilisé : tu peux le supprimer.)
 
 ## Étape 3 — Lancer la mise à jour du serveur (2 min, puis 3 min d'attente)
 
