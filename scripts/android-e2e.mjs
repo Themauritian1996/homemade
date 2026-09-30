@@ -214,8 +214,18 @@ try {
   await tap(/^Profil$|^Profile$/);
   await sleep(1500);
   shot('profil');
+  // « Paramètres » est plus bas dans le Profil : on fait défiler avant de toucher.
+  if (!(await find(/^Paramètres$|^Settings$/, { timeout: 3000 }))) {
+    adb('shell', 'input', 'swipe', '540', '1800', '540', '700', '400');
+    await sleep(1200);
+  }
   await tap(/^Paramètres$|^Settings$/);
-  await find(/Langue · Language/);
+  await sleep(1500);
+  // Le choix de langue est au milieu des Paramètres.
+  for (let i = 0; i < 4 && !(await find(/^English$/, { timeout: 2000 })); i++) {
+    adb('shell', 'input', 'swipe', '540', '1800', '540', '900', '400');
+    await sleep(1000);
+  }
   await tap(/^English$/);
   const en = await find(/App language|Search/, { timeout: 15_000 });
   step(Boolean(en), 'Passage en anglais');
