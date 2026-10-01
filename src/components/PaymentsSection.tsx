@@ -5,7 +5,8 @@
  */
 import { Ionicons } from '@expo/vector-icons';
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Linking, StyleSheet, Text, View } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
+import { ActivityIndicator, Alert, AppState, StyleSheet, Text, View } from 'react-native';
 import { t } from '@/i18n';
 import { config } from '@/lib/config';
 import { friendlyError } from '@/lib/errors';
@@ -29,6 +30,11 @@ export function PaymentsSection({ refreshKey }: { refreshKey?: string }) {
       .finally(() => setLoading(false));
   }, []);
   useEffect(load, [load, refreshKey]);
+  // Retour dans l'app (après le formulaire Stripe, même fermé à la main) : statut relu.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (st) => st === 'active' && load());
+    return () => sub.remove();
+  }, [load]);
 
   if (!SALES_ENABLED) {
     return (
@@ -43,7 +49,9 @@ export function PaymentsSection({ refreshKey }: { refreshKey?: string }) {
     setOpening(true);
     try {
       const link = await paymentsLink();
-      if (link?.url) await Linking.openURL(link.url);
+      // Fenêtre Stripe intégrée : elle se ferme d'elle-même quand Stripe renvoie vers homemade://settings.
+      if (link?.url) await WebBrowser.openAuthSessionAsync(link.url, 'homemade://settings');
+      load();
     } catch (e) {
       Alert.alert(t('Paiements indisponibles'), friendlyError(e, t('Réessayez plus tard.')));
     } finally {
