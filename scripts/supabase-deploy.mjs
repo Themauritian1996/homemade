@@ -301,6 +301,12 @@ async function pushSetup() {
     `insert into public.push_config (id, endpoint, secret) values (true, ${lit(endpoint)}, ${lit(secret)})
      on conflict (id) do update set endpoint = excluded.endpoint, secret = excluded.secret, updated_at = now()`,
   );
+  const net = await sql(`select 1 from pg_extension where extname = 'pg_net'`);
+  if (!net?.length) {
+    await sql(`create extension if not exists pg_net`).catch((e) =>
+      fail(`Extension pg_net indisponible (Supabase → Database → Extensions → pg_net → activer) : ${e.message}`),
+    );
+  }
   console.log(`✓ Notifications push activées (projet Firebase « ${sa.project_id} »).`);
 }
 
