@@ -708,7 +708,7 @@ export const EN: Record<string, string> = {
   "Clair": "Light",
   "Sombre": "Dark",
   "« Automatique » suit le réglage du téléphone.": "“Automatic” follows your phone's setting.",
-  "Pendant la bêta, les notifications arrivent quand l’app est ouverte ou en arrière-plan récent. Les alertes avec l’app complètement fermée arrivent bientôt.": "During the beta, notifications arrive while the app is open or recently in the background. Alerts with the app fully closed are coming soon.",
+  "Vous êtes prévenu·e des nouveaux messages et de chaque étape de vos échanges (demande, acceptation, remise).": "You're notified of new messages and every step of your exchanges (request, acceptance, handover).",
   "Toutes les portions sont réservées : échange en cours.": "All portions are reserved: exchange in progress.",
   "Partager votre adresse ?": "Share your address?",
   "L’autre personne verra votre adresse exacte et pourra ouvrir l’itinéraire. Vous pouvez aussi convenir d’un point de rencontre dans le chat.": "The other person will see your exact address and can open directions. You can also agree on a meeting point in the chat.",

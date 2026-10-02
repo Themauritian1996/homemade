@@ -53,7 +53,7 @@ Le document à relire avant chaque décision produit ou technique. Si une demand
 | Critères d'avis | Cooker : goût, hygiène, conformité, ponctualité · Eater : venu à l'heure, communication, respect, fiabilité | `src/data/reviewCriteria.ts`, `review_summary` |
 | Conversations terminées | Supprimables (balayage) ; masquées automatiquement 48 h après la fin ; effacées du serveur après 30 jours | `hide_conversation`, `my_conversations`, `purge_old_conversations` (pg_cron) |
 | Apparence | Automatique (suit le téléphone) · clair · sombre ; carte OpenFreeMap « dark » | `applyScheme`, `createStyles` (`src/theme`), `themeMode` |
-| Notifications | Locales (app ouverte ou en arrière-plan récent) pour messages et étapes de commande ; push app fermée = étape suivante (Firebase) | `src/lib/notifications.ts`, préférence `notify_messages` |
+| Notifications | Messages et étapes de commande. Avec Firebase : push FCM même app fermée (jeton par appareil, envoi par la base via pg_net → `push-notify`, jamais bloquant) ; sans Firebase : locales (app ouverte) | `src/lib/notifications.ts`, `push_tokens`, `push-notify`, secrets `GOOGLE_SERVICES_JSON`, `FIREBASE_SERVICE_ACCOUNT`, préférence `notify_messages` |
 | Objectif rappel allergènes IA | ≥ 98 % | jeu d'évaluation (docs/03) |
 | Objectif latence analyse | p95 < 8 s | idem |
 

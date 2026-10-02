@@ -11,6 +11,8 @@
 #   GMAIL_APP_PASSWORD     facultatif : « mot de passe d'application » Google de cette adresse (myaccount.google.com/apppasswords)
 #   STRIPE_SECRET_KEY      facultatif : clé secrète Stripe (sk_test_… pour tester sans argent réel) → active l'ACHAT dans l'app
 #                          (avec STRIPE_PUBLISHABLE_KEY, lue par le robot « APK Android »)
+#   FIREBASE_SERVICE_ACCOUNT facultatif : JSON du compte de service Firebase → notifications même app fermée
+#                          (avec GOOGLE_SERVICES_JSON, lu par le robot « APK Android »)
 # Projet : homemade au Canada (lcpoxseqtabauemymlss) ; autre projet possible via la variable SUPABASE_PROJECT_REF.
 name: Serveur Supabase
 
@@ -51,6 +53,7 @@ jobs:
       GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
       GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
       STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+      FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
     steps:
       - uses: actions/checkout@v4
 
@@ -94,7 +97,7 @@ jobs:
         run: |
           # Envoi par l'API (le serveur Supabase assemble chaque fonction). 3 essais par fonction : l'API de gestion de
           # Supabase a parfois des erreurs passagères. verify_jwt vient de supabase/config.toml.
-          for fn in analyze-meal order-action create-payment-intent stripe-connect-onboard stripe-webhook stripe-return; do
+          for fn in analyze-meal order-action create-payment-intent stripe-connect-onboard stripe-webhook stripe-return push-notify; do
             ok=""
             for attempt in 1 2 3; do
               if supabase functions deploy "$fn" --project-ref "$SUPABASE_PROJECT_REF" --use-api; then ok=1; break; fi
@@ -107,6 +110,10 @@ jobs:
       - name: Paiements Stripe (webhooks, si la clé est fournie)
         if: ${{ !inputs.dry_run }}
         run: node scripts/supabase-deploy.mjs stripe
+
+      - name: Notifications push (Firebase, si le compte de service est fourni)
+        if: ${{ !inputs.dry_run }}
+        run: node scripts/supabase-deploy.mjs push
 
       - name: Test de bout en bout sur le serveur réel (compte temporaire, supprimé ensuite)
         if: ${{ !inputs.dry_run }}

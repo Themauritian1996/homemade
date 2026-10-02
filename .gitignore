@@ -48,3 +48,4 @@ supabase/.temp/
 
 # réglages locaux de l'assistant
 .claude/
+google-services.json

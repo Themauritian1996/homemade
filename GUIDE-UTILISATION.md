@@ -89,6 +89,20 @@ Sans cette étape, les plats s'**échangent** seulement. Avec elle, les Eaters p
 7. Test : un Cooker va dans **Profil → Paiements et adresse → Activer la vente** (en mode test, Stripe propose des données fictives : utilise « Utiliser des données de test » / numéro de téléphone `000 000 0000`, code `000000`). Un Eater commande avec la carte **4242 4242 4242 4242**, date future, code au choix.
 8. **Argent réel (plus tard)** : active ton compte Stripe (identité, compte bancaire), puis remplace les deux secrets par les clés **live** (`sk_live_…`, `pk_live_…`). ⚠️ Avant, vérifie avec un professionnel : MAPAQ, taxes (TPS/TVQ), assurance.
 
+### 2-E. (Facultatif, recommandé) Notifications même app fermée — Firebase, 10 min, 0 $
+Sans cette étape, les notifications arrivent seulement quand l'app est ouverte (ou en arrière-plan depuis peu). Avec elle, le téléphone sonne même app fermée, comme WhatsApp. Firebase est le service gratuit de Google qui livre les notifications Android.
+1. Va sur **https://console.firebase.google.com** (connecte-toi avec ton compte Google) → **Créer un projet** → nom `homemade` → décoche **Google Analytics** → **Créer le projet**.
+2. Sur la page du projet, touche l'icône **Android** (« Ajouter une application ») → **Nom du package Android** : `app.homemade.mobile` (exactement) → **Enregistrer l'application** → **Télécharger google-services.json** → puis **Suivant**, **Suivant**, **Accéder à la console** (ignore les étapes de code).
+3. ⚙️ (à côté de « Vue d'ensemble du projet ») → **Paramètres du projet** → onglet **Comptes de service** → **Générer une nouvelle clé privée** → **Générer la clé** : un 2ᵉ fichier `.json` se télécharge. 🔒 Ne le partage avec personne (pas même dans le chat) : il va seulement dans GitHub.
+4. Dans GitHub (même page qu'en 2-B), ajoute deux secrets. Pour la valeur, ouvre chaque fichier avec le **Bloc-notes**, **Ctrl+A** puis **Ctrl+C**, et colle tout :
+
+| Name (exactement) | Valeur |
+|---|---|
+| `GOOGLE_SERVICES_JSON` | tout le contenu de `google-services.json` |
+| `FIREBASE_SERVICE_ACCOUNT` | tout le contenu du 2ᵉ fichier (celui du compte de service) |
+
+5. Onglet **Actions** : lance **Serveur Supabase** (journal : « ✓ Notifications push : Firebase accepte le compte de service »), puis **APK Android** → **Run workflow**. Installe la nouvelle APK : à la première ouverture, accepte les notifications.
+
 ## Étape 3 — Lancer la mise à jour du serveur (2 min, puis 3 min d'attente)
 
 La nouvelle version est déjà dans la branche principale (`main`) : l'APK se fabrique tout seul (≈ 25 min, robot **APK Android**).

@@ -5,10 +5,12 @@
 //   node scripts/supabase-deploy.mjs auth         réglages d'inscription (courriels par Gmail si GMAIL_ADDRESS/GMAIL_APP_PASSWORD, sinon sans courriel)
 //   node scripts/supabase-deploy.mjs app-config   écrit l'URL et la clé PUBLIQUE du projet dans $GITHUB_ENV (pour l'APK)
 //   node scripts/supabase-deploy.mjs stripe        paiements : points d'accès webhook Stripe + secrets (si STRIPE_SECRET_KEY)
+//   node scripts/supabase-deploy.mjs push          notifications push : compte de service Firebase + secret partagé (si FIREBASE_SERVICE_ACCOUNT)
 //   node scripts/supabase-deploy.mjs robot-create  compte de test temporaire (test sur émulateur Android) → $GITHUB_ENV
 //   node scripts/supabase-deploy.mjs robot-delete  supprime ce compte et tout ce qu'il a créé
 // Variables : SUPABASE_ACCESS_TOKEN (secret), SUPABASE_PROJECT_REF (identifiant du projet, non secret).
 // N'affiche jamais de clé : seule la clé publique (anon/publishable) est transmise à l'APK, comme avant.
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -269,6 +271,45 @@ async function stripeSetup() {
   }
 }
 
+// ─────────────────────────────────────────────── Notifications push (Firebase Cloud Messaging)
+async function pushSetup() {
+  const raw = process.env.FIREBASE_SERVICE_ACCOUNT?.trim();
+  if (!raw) {
+    console.log('Notifications push : pas de compte Firebase (secret FIREBASE_SERVICE_ACCOUNT) → notifications quand l’app est ouverte seulement (voir le guide).');
+    return;
+  }
+  let sa;
+  try {
+    sa = JSON.parse(raw);
+  } catch {
+    fail('FIREBASE_SERVICE_ACCOUNT n’est pas un JSON valide : colle TOUT le contenu du fichier téléchargé depuis Firebase (de { à }).');
+  }
+  if (sa.type !== 'service_account' || !sa.project_id || !sa.client_email || !sa.private_key) {
+    fail('FIREBASE_SERVICE_ACCOUNT ne ressemble pas à un compte de service Firebase (Paramètres du projet → Comptes de service → Générer une nouvelle clé privée).');
+  }
+  // Secret partagé base ↔ fonction : créé une fois puis réutilisé (la base l'envoie à chaque notification).
+  const rows = await sql(`select secret from public.push_config where id`);
+  const secret = rows?.[0]?.secret ?? crypto.randomBytes(32).toString('hex');
+  console.log(`::add-mask::${secret}`);
+  const r = await api('POST', `/projects/${ref}/secrets`, [
+    { name: 'FIREBASE_SERVICE_ACCOUNT', value: raw },
+    { name: 'PUSH_WEBHOOK_SECRET', value: secret },
+  ]);
+  if (r.status >= 300) fail(`Secrets push non enregistrés (HTTP ${r.status}) : ${r.text.slice(0, 200)}`);
+  const endpoint = `https://${ref}.supabase.co/functions/v1/push-notify`;
+  await sql(
+    `insert into public.push_config (id, endpoint, secret) values (true, ${lit(endpoint)}, ${lit(secret)})
+     on conflict (id) do update set endpoint = excluded.endpoint, secret = excluded.secret, updated_at = now()`,
+  );
+  const net = await sql(`select 1 from pg_extension where extname = 'pg_net'`);
+  if (!net?.length) {
+    await sql(`create extension if not exists pg_net`).catch((e) =>
+      fail(`Extension pg_net indisponible (Supabase → Database → Extensions → pg_net → activer) : ${e.message}`),
+    );
+  }
+  console.log(`✓ Notifications push activées (projet Firebase « ${sa.project_id} »).`);
+}
+
 // ─────────────────────────────────────────────── Compte robot (test de l'APK sur émulateur Android)
 async function serviceKey() {
   const keys = await api('GET', `/projects/${ref}/api-keys?reveal=true`);
@@ -467,6 +508,15 @@ async function smoke(imagePath) {
       const size = t ? (await t.arrayBuffer()).byteLength : 0;
       console.log(`${t?.status === 200 && type.startsWith('image/') && size > 2000 ? '✓' : '⚠'} Fond de carte ${label} : HTTP ${t?.status ?? 'réseau'} · ${type} · ${size} octets`);
     }
+    // Notifications push : la fonction répond et, si Firebase est configuré, Google accepte le compte de service.
+    const pushCfg = await sql(`select secret from public.push_config where id`).catch(() => null);
+    if (pushCfg?.[0]?.secret) {
+      console.log(`::add-mask::${pushCfg[0].secret}`);
+      const pp = await http('POST', '/functions/v1/push-notify', { body: { ping: true }, headers: { 'x-push-secret': pushCfg[0].secret } });
+      step(pp.status === 200 && pp.json?.firebase === true, 'Notifications push : Firebase accepte le compte de service', pp.json?.project ?? pp.text.slice(0, 200));
+    } else {
+      console.log('⚠ Notifications push non configurées (Firebase) : seulement quand l’app est ouverte.');
+    }
     const addr = await as('POST', '/rest/v1/rpc/set_my_address', { body: { p_address: '1 rue Test', p_postal_code: 'h2j1a1', p_lat: 45.5231, p_lng: -73.5817 } });
     step(addr.status === 200 && addr.json?.zone === 'H2J', 'Adresse privée enregistrée (zone publique H2J)', `HTTP ${addr.status}`);
 
@@ -516,6 +566,7 @@ try {
   else if (command === 'auth') await auth();
   else if (command === 'app-config') await appConfig();
   else if (command === 'stripe') await stripeSetup();
+  else if (command === 'push') await pushSetup();
   else if (command === 'robot-create') await robotCreate();
   else if (command === 'robot-delete') await robotDelete();
   else fail(`Commande inconnue : ${command}`);
