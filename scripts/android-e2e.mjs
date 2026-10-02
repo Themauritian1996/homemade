@@ -227,7 +227,8 @@ try {
     await sleep(1000);
   }
   await tap(/^English$/);
-  const en = await find(/^Settings$|Public profile|App language/, { timeout: 15_000 });
+  // Android affiche certains titres en majuscules (« PUBLIC PROFILE ») : comparaison insensible à la casse.
+  const en = await find(/^Settings$|Public profile|App language|Save profile|Find on the map|Appearance/i, { timeout: 25_000 });
   step(Boolean(en), 'Passage en anglais');
   shot('parametres-anglais');
   await tap(/^Français$/);
