@@ -108,6 +108,57 @@ async function check() {
   for (const m of migrationFiles()) console.log(`  ${applied.has(m.version) ? '✓ déjà appliquée' : '· à appliquer   '}  ${m.file}`);
   const tables = await sql(`select count(*)::int as n from information_schema.tables where table_schema = 'public'`);
   console.log(`Tables dans le schéma public : ${tables?.[0]?.n}`);
+  await productionReport().catch((e) => console.log(`(état de production illisible : ${e.message})`));
+}
+
+/** État de production en LECTURE SEULE (aucune donnée personnelle affichée : seulement des totaux et des réglages). */
+async function productionReport() {
+  console.log('\n── État de production (lecture seule)');
+  const proj = await api('GET', `/projects/${ref}`);
+  console.log(`Région : ${proj.json?.region} · Postgres ${proj.json?.database?.version ?? '?'} · statut ${proj.json?.status}`);
+  const org = proj.json?.organization_id ? await api('GET', `/organizations/${proj.json.organization_id}`) : null;
+  if (org?.json?.plan) console.log(`Forfait de l'organisation : ${org.json.plan}`);
+  const one = async (label, query) => {
+    try {
+      const r = await sql(query, { retry: false });
+      console.log(`${label} : ${JSON.stringify(r)}`);
+    } catch (e) {
+      console.log(`${label} : (illisible) ${e.message.slice(0, 160)}`);
+    }
+  };
+  await one('Taille de la base', `select pg_size_pretty(pg_database_size(current_database())) as taille`);
+  await one('Extensions', `select string_agg(extname || ' ' || extversion, ', ' order by extname) as ext from pg_extension`);
+  await one('Tâches planifiées', `select jobname, schedule, active from cron.job order by jobname`);
+  await one('Dernières exécutions en échec (7 j)', `select j.jobname, count(*)::int as echecs from cron.job_run_details d join cron.job j on j.jobid = d.jobid where d.status <> 'succeeded' and d.start_time > now() - interval '7 days' group by 1`);
+  await one('Volumes', `select (select count(*) from auth.users)::int as comptes, (select count(*) from public.profiles where deleted_at is null)::int as profils_actifs, (select count(*) from public.meals)::int as plats, (select count(*) from public.orders)::int as commandes, (select count(*) from public.messages)::int as messages, (select count(*) from public.ai_analyses)::int as analyses_ia, (select count(*) from public.push_tokens)::int as telephones_push, (select count(*) from public.reports)::int as signalements`);
+  await one('Stockage (fichiers)', `select bucket_id, count(*)::int as fichiers, pg_size_pretty(coalesce(sum((metadata->>'size')::bigint), 0)) as taille from storage.objects group by 1`);
+  await one('Plus grosses tables', `select relname as table, pg_size_pretty(pg_total_relation_size(c.oid)) as taille from pg_class c join pg_namespace n on n.oid = c.relnamespace where n.nspname = 'public' and c.relkind = 'r' order by pg_total_relation_size(c.oid) desc limit 5`);
+  await one('Requêtes les plus coûteuses', `select left(regexp_replace(query, '\\s+', ' ', 'g'), 90) as requete, calls::int as appels, round(mean_exec_time::numeric, 1) as ms_moy from extensions.pg_stat_statements order by total_exec_time desc limit 8`);
+  await one('Connexions', `select count(*)::int as actives, current_setting('max_connections') as max from pg_stat_activity`);
+  const authCfg = await api('GET', `/projects/${ref}/config/auth`);
+  const a = authCfg.json ?? {};
+  const keys = ['mailer_autoconfirm', 'password_min_length', 'password_required_characters', 'password_hibp_enabled', 'security_captcha_enabled', 'jwt_exp', 'refresh_token_rotation_enabled', 'security_refresh_token_reuse_interval', 'rate_limit_email_sent', 'rate_limit_token_refresh', 'rate_limit_verify', 'rate_limit_otp', 'rate_limit_anonymous_users', 'external_email_enabled', 'disable_signup', 'sessions_timebox', 'sessions_inactivity_timeout', 'mfa_totp_enroll_enabled'];
+  console.log(`Réglages d'authentification : ${JSON.stringify(Object.fromEntries(keys.filter((k) => k in a).map((k) => [k, a[k]])))}`);
+  const pg = await api('GET', `/projects/${ref}/postgrest`);
+  if (pg.json) console.log(`API REST : max_rows=${pg.json.max_rows}, schémas=${pg.json.db_schema}`);
+  const ssl = await api('GET', `/projects/${ref}/ssl-enforcement`);
+  if (ssl.json) console.log(`SSL imposé à la base : ${JSON.stringify(ssl.json.currentConfig ?? ssl.json)}`);
+  const nb = await api('GET', `/projects/${ref}/network-restrictions`);
+  if (nb.json) console.log(`Restrictions réseau de la base : ${JSON.stringify(nb.json.config ?? nb.json)}`);
+  const adv = await api('GET', `/projects/${ref}/advisors/security`);
+  if (adv.status === 200) {
+    const lints = adv.json?.lints ?? [];
+    console.log(`Conseiller sécurité Supabase : ${lints.length} alerte(s)`);
+    for (const l of lints.slice(0, 25)) console.log(`  [${l.level}] ${l.name} — ${(l.detail ?? l.title ?? '').slice(0, 160)}`);
+  }
+  const perf = await api('GET', `/projects/${ref}/advisors/performance`);
+  if (perf.status === 200) {
+    const lints = perf.json?.lints ?? [];
+    console.log(`Conseiller performance Supabase : ${lints.length} alerte(s)`);
+    const byName = {};
+    for (const l of lints) byName[l.name] = (byName[l.name] ?? 0) + 1;
+    console.log(`  ${JSON.stringify(byName)}`);
+  }
 }
 
 async function migrate() {
