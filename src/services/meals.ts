@@ -121,6 +121,13 @@ export async function publishMeal(input: PublishMealInput): Promise<{ id: string
   return { id: data as string };
 }
 
+/** Origine et date de la photo (appareil photo / galerie + EXIF) : indice de fraîcheur affiché aux voisins. */
+export async function setMealPhotoMeta(mealId: string, takenAt: string | null, source: 'camera' | 'library'): Promise<void> {
+  if (DEMO_MODE) return;
+  const { error } = await requireSupabase().rpc('set_meal_photo_meta', { p_meal_id: mealId, p_taken_at: takenAt, p_source: source });
+  if (error) throw error;
+}
+
 /** Mes plats publiés proposables en échange (mode « échange » ou « les deux »). */
 export async function fetchMySwappableMeals(userId: string): Promise<Meal[]> {
   if (DEMO_MODE) return demoMeals.filter((m) => m.mode !== 'sale').slice(0, 3);

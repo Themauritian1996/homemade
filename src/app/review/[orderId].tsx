@@ -3,24 +3,17 @@
  * qu'une fois les deux avis soumis (ou après 7 jours) — pas de représailles, avis plus honnêtes.
  */
 import { router, useLocalSearchParams } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Alert, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, Chip, IconButton, Stars } from '@/components/ui';
 import { friendlyError } from '@/lib/errors';
-import { submitReview } from '@/services/orders';
+import { REVIEW_CRITERIA, REVIEW_TAGS } from '@/data/reviewCriteria';
+import { fetchOrder, OrderSummary, submitReview } from '@/services/orders';
+import { useApp } from '@/store/app';
 import { colors, fonts, radius, spacing, type } from '@/theme';
 
 import { t } from '@/i18n';
-// Rôle affiché : ici l'Eater note le Cooker. L'écran symétrique (Cooker → Eater) utilise EATER_CRITERIA.
-const COOKER_CRITERIA = [
-  { id: 'taste', label: 'Goût' },
-  { id: 'hygiene', label: 'Hygiène & emballage' },
-  { id: 'accuracy', label: 'Conforme à l’annonce' },
-  { id: 'punctuality', label: 'Ponctualité' },
-];
-const TAGS = ['Généreux', 'Savoureux', 'Bien emballé', 'Sympathique', 'Ponctuel', 'Sain', 'Comme à la maison'];
-
 export default function ReviewModal() {
   const { orderId } = useLocalSearchParams<{ orderId: string }>();
   const insets = useSafeAreaInsets();
@@ -29,13 +22,26 @@ export default function ReviewModal() {
   const [tags, setTags] = useState<string[]>([]);
   const [comment, setComment] = useState('');
   const [loading, setLoading] = useState(false);
+  // Rôle de la personne notée : l'Eater note le Cooker (le plat), le Cooker note l'Eater (sa fiabilité).
+  const me = useApp((st) => st.user?.id);
+  const [order, setOrder] = useState<OrderSummary | null>(null);
+  useEffect(() => {
+    fetchOrder(orderId).then(setOrder).catch(() => {});
+  }, [orderId]);
+  const subjectRole: 'cooker' | 'eater' = order && me === order.cookerId ? 'eater' : 'cooker';
+  const criteria = REVIEW_CRITERIA[subjectRole];
+  const tagChoices = REVIEW_TAGS[subjectRole];
 
   const submit = async () => {
     if (rating === 0) return Alert.alert(t('Note requise'), t('Choisissez une note globale.'));
     setLoading(true);
     try {
       await submitReview({ orderId, rating, comment, tags, subScores: sub });
-      Alert.alert(t('Merci !'), t('Votre avis sera publié dès que les deux parties auront noté l’échange.'));
+      // Double-aveugle (règle de la plateforme) : personne ne voit la note de l'autre avant d'avoir donné la sienne.
+      Alert.alert(
+        t('Merci !'),
+        t('Votre avis est enregistré. Il sera publié en même temps que celui de l’autre personne (ou dans 7 jours au plus tard) : personne ne voit la note de l’autre avant d’avoir donné la sienne.'),
+      );
       router.back();
     } catch (e) {
       Alert.alert(t('Avis non enregistré'), friendlyError(e));
@@ -56,7 +62,7 @@ export default function ReviewModal() {
           <Stars value={rating} size={40} onChange={setRating} />
         </View>
         <View style={{ gap: spacing.lg }}>
-          {COOKER_CRITERIA.map((c) => (
+          {criteria.map((c) => (
             <View key={c.id} style={{ flexDirection: 'row', alignItems: 'center' }}>
               <Text style={[type.bodyStrong, { flex: 1 }]}>{t(c.label)}</Text>
               <Stars value={sub[c.id] ?? 0} size={22} onChange={(v) => setSub({ ...sub, [c.id]: v })} />
@@ -64,7 +70,7 @@ export default function ReviewModal() {
           ))}
         </View>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
-          {TAGS.map((tag) => (
+          {tagChoices.map((tag) => (
             <Chip key={tag} label={t(tag)} selected={tags.includes(tag)} onPress={() => setTags(tags.includes(tag) ? tags.filter((x) => x !== tag) : [...tags, tag])} />
           ))}
         </View>

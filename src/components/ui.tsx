@@ -6,7 +6,7 @@ import { router } from 'expo-router';
 import React from 'react';
 import { ActivityIndicator, Pressable, PressableProps, StyleProp, StyleSheet, Text, TextInput, TextInputProps, View, ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, fonts, radius, spacing, type } from '@/theme';
+import { colors, createStyles, fonts, radius, spacing, type } from '@/theme';
 import { formatRating } from '@/lib/format';
 
 import { t } from '@/i18n';
@@ -309,7 +309,7 @@ export function ListRow({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   logo: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   logoText: { fontFamily: fonts.display, letterSpacing: -0.5 },
   screenHeader: {
@@ -414,4 +414,4 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   iconBadgeText: { color: colors.onDark, fontFamily: fonts.bold, fontSize: 10 },
-});
+}));

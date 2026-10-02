@@ -2,13 +2,13 @@
 import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useState } from 'react';
-import { Alert, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { Alert, FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Badge, Button, EmptyState, ScreenHeader } from '@/components/ui';
 import { friendlyError } from '@/lib/errors';
 import { formatPrice, timeLeft } from '@/lib/format';
 import { fetchMyMeals, MyMeal, withdrawMeal } from '@/services/account';
-import { colors, radius, shadow, spacing, type } from '@/theme';
+import { colors, createStyles, radius, shadow, spacing, type } from '@/theme';
 
 import { t } from '@/i18n';
 const STATUS: Record<string, { label: string; tone: 'forest' | 'saffron' | 'danger' | 'neutral' }> = {
@@ -70,7 +70,7 @@ export default function MyMeals() {
               title={t('Aucun plat publié')}
               body={t('Vous cuisinez trop ? Partagez une portion avec vos voisins : une photo suffit.')}
             >
-              <Button title={t('Publier un plat')} variant="accent" icon="camera" onPress={() => router.push('/publish')} style={{ marginTop: spacing.md }} />
+              <Button title={t('Publier un plat')} variant="accent" icon="camera" onPress={() => router.navigate('/publish')} style={{ marginTop: spacing.md }} />
             </EmptyState>
           )
         }
@@ -96,7 +96,7 @@ export default function MyMeals() {
               </Pressable>
               <View style={{ flexDirection: 'row', gap: spacing.sm }}>
                 {m.activeOrders > 0 && (
-                  <Button title={t('Voir les demandes')} size="md" icon="chatbubbles-outline" onPress={() => router.push('/inbox')} style={{ flex: 1 }} />
+                  <Button title={t('Voir les demandes')} size="md" icon="chatbubbles-outline" onPress={() => router.navigate('/inbox')} style={{ flex: 1 }} />
                 )}
                 <Button title={t('Retirer')} size="md" variant="secondary" icon="eye-off-outline" onPress={() => withdraw(m)} style={{ flex: 1 }} />
               </View>
@@ -108,8 +108,8 @@ export default function MyMeals() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   card: { backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.md, gap: spacing.md, ...shadow.card },
   row: { flexDirection: 'row', gap: spacing.md, alignItems: 'center' },
   thumb: { width: 76, height: 76, borderRadius: radius.md, backgroundColor: colors.surfaceAlt },
-});
+}));

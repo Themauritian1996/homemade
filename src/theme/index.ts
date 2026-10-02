@@ -4,9 +4,9 @@
  * mais avec la rigueur visuelle d'une app premium (Good Food, Airbnb, Uber Eats).
  * Toute couleur/espacement/typo de l'app doit venir d'ici.
  */
-import { Platform, TextStyle, ViewStyle } from 'react-native';
+import { Platform, StyleSheet, TextStyle, ViewStyle } from 'react-native';
 
-export const colors = {
+const light = {
   // Surfaces
   bg: '#FAF6EF', // crème — fond global
   surface: '#FFFFFF',
@@ -36,7 +36,49 @@ export const colors = {
   info: '#2F6FB0',
 
   overlay: 'rgba(27,26,23,0.45)',
-} as const;
+  /** Fond toujours sombre (écran d'analyse photo), quel que soit le thème. */
+  night: '#1B1A17',
+};
+
+/** Mode sombre : même identité (crème → brun nuit, vert forêt éclairci), contrastes AA sur les surfaces sombres. */
+const dark: Palette = {
+  bg: '#141412',
+  surface: '#1E1D1A',
+  surfaceAlt: '#2A2824',
+  border: '#3A3731',
+
+  forest: '#4E8C6C',
+  forestSoft: '#3D7258',
+  sage: '#17241D',
+  tomato: '#E2553B',
+  tomatoSoft: '#3A231D',
+  saffron: '#F2B441',
+  saffronSoft: '#3A3020',
+
+  ink: '#F3EFE7',
+  inkSoft: '#CFC9BD',
+  muted: '#9A958B',
+  onDark: '#FFFFFF',
+
+  success: '#4FA172',
+  warning: '#E0A040',
+  danger: '#E5634B',
+  dangerSoft: '#3A1E19',
+  info: '#5B9BD8',
+
+  overlay: 'rgba(0,0,0,0.6)',
+  night: '#1B1A17',
+};
+
+export type Palette = Record<keyof typeof light, string>;
+export type Scheme = 'light' | 'dark';
+
+/** Palette active : ses valeurs changent avec le thème (l'arbre d'écrans est alors reconstruit). */
+export const colors: Palette = { ...light };
+let currentScheme: Scheme = 'light';
+let version = 0;
+export const getScheme = () => currentScheme;
+
 
 export const spacing = { xxs: 2, xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 24, xxxl: 32, huge: 48 } as const;
 
@@ -51,7 +93,7 @@ export const fonts = {
   bold: 'Inter_700Bold',
 } as const;
 
-export const type = {
+const buildType = () => ({
   hero: { fontFamily: fonts.display, fontSize: 34, lineHeight: 40, color: colors.ink, letterSpacing: -0.5 },
   h1: { fontFamily: fonts.display, fontSize: 28, lineHeight: 34, color: colors.ink, letterSpacing: -0.3 },
   h2: { fontFamily: fonts.display, fontSize: 22, lineHeight: 28, color: colors.ink },
@@ -61,7 +103,36 @@ export const type = {
   caption: { fontFamily: fonts.medium, fontSize: 13, lineHeight: 18, color: colors.muted },
   label: { fontFamily: fonts.semibold, fontSize: 12, lineHeight: 16, color: colors.muted, letterSpacing: 0.6, textTransform: 'uppercase' },
   price: { fontFamily: fonts.bold, fontSize: 17, color: colors.ink },
-} satisfies Record<string, TextStyle>;
+}) satisfies Record<string, TextStyle>;
+
+export const type = buildType();
+
+/** Applique un thème : la palette et la typographie sont mises à jour, les feuilles de style se recalculent. */
+export function applyScheme(scheme: Scheme) {
+  if (scheme === currentScheme) return;
+  currentScheme = scheme;
+  Object.assign(colors, scheme === 'dark' ? dark : light);
+  Object.assign(type, buildType());
+  version++;
+}
+
+/**
+ * Feuille de style qui suit le thème : se déclare comme StyleSheet.create, mais est recalculée (puis mise en cache)
+ * quand le thème change. L'arbre d'écrans étant reconstruit à ce moment, chaque écran relit les bonnes couleurs.
+ */
+export function createStyles<T extends StyleSheet.NamedStyles<T>>(factory: () => T): T {
+  let cache: T | null = null;
+  let cachedFor = -1;
+  return new Proxy({} as T, {
+    get(_, key) {
+      if (!cache || cachedFor !== version) {
+        cache = StyleSheet.create(factory());
+        cachedFor = version;
+      }
+      return cache[key as keyof T];
+    },
+  });
+}
 
 export const shadow = {
   card: Platform.select<ViewStyle>({

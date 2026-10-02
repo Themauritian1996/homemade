@@ -1,15 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
-import { Alert, FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, FlatList, KeyboardAvoidingView, Platform, Pressable, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { OrderActions } from '@/components/OrderActions';
 import { Avatar, IconButton } from '@/components/ui';
 import { DEMO_USER_ID } from '@/data/mock';
-import { fetchConversations, fetchMessages, markConversationRead, refreshUnread, sendMessage, subscribeToConversation } from '@/services/chat';
+import { fetchConversations, fetchMessages, hideConversation, markConversationRead, refreshUnread, sendMessage, subscribeToConversation } from '@/services/chat';
 import { friendlyError } from '@/lib/errors';
+import { setActiveConversation } from '@/lib/notifications';
 import { useApp } from '@/store/app';
-import { colors, fonts, radius, spacing, type } from '@/theme';
+import { colors, createStyles, fonts, radius, spacing, type } from '@/theme';
 import type { Conversation, Message } from '@/types';
 
 import { locale, t } from '@/i18n';
@@ -23,9 +24,16 @@ export default function Chat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState('');
   const listRef = useRef<FlatList<Message>>(null);
+  const wasClosed = useRef<boolean | null>(null);
+
+  const loadConv = () =>
+    fetchConversations()
+      .then((all) => setConv(all.find((c) => c.id === id) ?? null))
+      .catch(() => {});
 
   useEffect(() => {
-    fetchConversations().then((all) => setConv(all.find((c) => c.id === id) ?? null));
+    setActiveConversation(id);
+    loadConv();
     fetchMessages(id).then(setMessages);
     const markRead = () =>
       markConversationRead(id)
@@ -36,8 +44,49 @@ export default function Chat() {
       setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]));
       markRead(); // conversation ouverte : le message est lu
     });
-    return unsubscribe;
+    return () => {
+      unsubscribe();
+      setActiveConversation(null);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  // Un message système (remise, annulation…) peut clore la transaction : on relit l'état de la conversation.
+  const systemCount = messages.filter((m) => m.kind === 'system').length;
+  useEffect(() => {
+    if (systemCount) loadConv();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [systemCount]);
+
+  const askDelete = () =>
+    Alert.alert(
+      t('Supprimer la conversation ?'),
+      t('La transaction est terminée. Sinon, la conversation sera effacée automatiquement dans 48 h.'),
+      [
+        { text: t('Garder'), style: 'cancel' },
+        {
+          text: t('Supprimer'),
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await hideConversation(id);
+              router.back();
+            } catch (e) {
+              Alert.alert(t('Suppression impossible'), friendlyError(e));
+            }
+          },
+        },
+      ],
+    );
+
+  // Transaction terminée pendant que la conversation est ouverte : on propose de la supprimer.
+  useEffect(() => {
+    if (!conv) return;
+    const closed = Boolean(conv.closed && conv.orderId);
+    if (wasClosed.current === false && closed) askDelete();
+    wasClosed.current = closed;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conv?.closed]);
 
   const send = async (text: string) => {
     if (!text.trim()) return;
@@ -58,16 +107,32 @@ export default function Chat() {
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
         <IconButton icon="chevron-back" onPress={() => router.back()} accessibilityLabel={t('Retour')} />
-        {conv && <Avatar uri={conv.other.avatarUrl} name={conv.other.displayName} size={40} verified={conv.other.isVerified} />}
-        <View style={{ flex: 1 }}>
-          <Text style={type.bodyStrong}>{conv?.other.displayName ?? t('Conversation')}</Text>
-          <Text style={type.caption} numberOfLines={1}>
-            {conv?.mealTitle}
-          </Text>
-        </View>
+        <Pressable
+          style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.md }}
+          disabled={!conv}
+          onPress={() => conv && router.push({ pathname: '/people/[id]', params: { id: conv.other.id } })}
+          accessibilityRole="button"
+          accessibilityLabel={t('Voir le profil et les avis')}
+        >
+          {conv && <Avatar uri={conv.other.avatarUrl} name={conv.other.displayName} size={40} verified={conv.other.isVerified} />}
+          <View style={{ flex: 1 }}>
+            <Text style={type.bodyStrong}>{conv?.other.displayName ?? t('Conversation')}</Text>
+            <Text style={type.caption} numberOfLines={1}>
+              {conv?.mealTitle}
+            </Text>
+          </View>
+        </Pressable>
+        {conv?.closed && <IconButton icon="trash-outline" onPress={askDelete} accessibilityLabel={t('Supprimer la conversation')} />}
       </View>
 
       {conv?.orderId && <OrderActions orderId={conv.orderId} me={me} refreshKey={messages.length} />}
+      {conv?.closed && conv.orderId && (
+        <Pressable style={styles.closed} onPress={askDelete} accessibilityRole="button">
+          <Ionicons name="time-outline" size={16} color={colors.muted} />
+          <Text style={[type.caption, { flex: 1 }]}>{t('Transaction terminée : cette conversation sera effacée dans 48 h.')}</Text>
+          <Text style={[type.caption, { color: colors.danger, fontFamily: fonts.semibold }]}>{t('Supprimer')}</Text>
+        </Pressable>
+      )}
 
       <FlatList
         ref={listRef}
@@ -117,8 +182,9 @@ export default function Chat() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingBottom: spacing.md, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border },
+  closed: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, backgroundColor: colors.surfaceAlt },
   system: { alignSelf: 'center', backgroundColor: colors.surfaceAlt, paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: radius.pill, marginVertical: spacing.sm },
   bubble: { maxWidth: '80%', paddingHorizontal: spacing.md, paddingVertical: 10, borderRadius: 18, gap: 2 },
   mine: { alignSelf: 'flex-end', backgroundColor: colors.forest, borderBottomRightRadius: 4 },
@@ -129,4 +195,4 @@ const styles = StyleSheet.create({
   composer: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm, paddingHorizontal: spacing.lg, paddingTop: spacing.sm, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border },
   input: { flex: 1, minHeight: 44, maxHeight: 120, backgroundColor: colors.bg, borderRadius: 22, paddingHorizontal: spacing.lg, paddingVertical: 11, fontFamily: fonts.regular, fontSize: 15, color: colors.ink },
   send: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.tomato, alignItems: 'center', justifyContent: 'center' },
-});
+}));

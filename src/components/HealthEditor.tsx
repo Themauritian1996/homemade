@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
-import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import { Pressable, Switch, Text, View } from 'react-native';
 import { AllergenCode, DIETS, allergenById } from '@/data/allergens';
-import { colors, fonts, radius, spacing, type } from '@/theme';
+import { colors, createStyles, fonts, radius, spacing, type } from '@/theme';
 import type { AllergenSeverity, HealthProfile } from '@/types';
 import { AllergenPicker } from './AllergenPicker';
 import { Chip } from './ui';
@@ -80,7 +80,7 @@ export function HealthEditor({ value, onChange }: { value: HealthProfile; onChan
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   card: { backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.lg, gap: spacing.md, borderWidth: 1, borderColor: colors.border },
   sevRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   segment: { flexDirection: 'row', backgroundColor: colors.surfaceAlt, borderRadius: radius.sm, padding: 3 },
@@ -88,4 +88,4 @@ const styles = StyleSheet.create({
   segActive: { backgroundColor: colors.danger },
   segText: { fontFamily: fonts.semibold, fontSize: 12, color: colors.inkSoft },
   notice: { flexDirection: 'row', gap: spacing.sm, backgroundColor: colors.sage, padding: spacing.lg, borderRadius: radius.lg },
-});
+}));

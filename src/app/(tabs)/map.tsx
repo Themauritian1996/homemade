@@ -9,10 +9,11 @@ import { MealCard } from '@/components/MealCard';
 import { NearbyList } from '@/components/NearbyList';
 import { ZoneSearch } from '@/components/ZoneSearch';
 import { Button, Chip } from '@/components/ui';
-import { formatPrice } from '@/lib/format';
+import { cuisineById } from '@/data/allergens';
+import { formatPriceShort } from '@/lib/format';
 import { useFeed } from '@/lib/useFeed';
 import { activeFilterCount, useApp } from '@/store/app';
-import { colors, fonts, radius, shadow, spacing, type } from '@/theme';
+import { colors, createStyles, fonts, radius, shadow, spacing, type } from '@/theme';
 import type { Meal } from '@/types';
 
 import { t } from '@/i18n';
@@ -73,8 +74,11 @@ function InteractiveMap({ onShowList, onError }: { onShowList: () => void; onErr
         id: m.id,
         latitude: m.pickupLocation.latitude,
         longitude: m.pickupLocation.longitude,
-        label: formatPrice(m.priceCents),
+        // Puce compacte : type de plat + prix par portion (« 🍝 5 $ »), « ⇄ » pour l'échange.
+        label: m.priceCents == null ? '' : formatPriceShort(m.priceCents),
         swap: m.mode !== 'sale',
+        emoji: cuisineById(m.cuisine).emoji,
+        pending: m.pending,
       })),
     [meals],
   );
@@ -215,7 +219,7 @@ function InteractiveMap({ onShowList, onError }: { onShowList: () => void; onErr
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   topOverlay: { position: 'absolute', left: spacing.xl, right: spacing.xl, gap: spacing.md },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   searchPill: {
@@ -253,4 +257,4 @@ const styles = StyleSheet.create({
     ...shadow.floating,
   },
   carousel: { position: 'absolute', bottom: spacing.xl, left: 0, right: 0, flexGrow: 0 },
-});
+}));

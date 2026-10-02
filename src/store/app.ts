@@ -26,7 +26,13 @@ interface AppState {
   lang: 'fr' | 'en';
   /** Dernier courriel utilisé pour se connecter : pré-rempli à la prochaine connexion. Conservé à la déconnexion. */
   lastEmail: string;
+  /** Apparence : selon le téléphone (auto), claire ou sombre. Conservée à la déconnexion. */
+  themeMode: 'auto' | 'light' | 'dark';
   setLang: (lang: 'fr' | 'en') => void;
+  setThemeMode: (mode: 'auto' | 'light' | 'dark') => void;
+  /** Notifications de messages et de commandes (copie locale de la préférence du compte). */
+  notifyMessages: boolean;
+  setNotifyMessages: (v: boolean) => void;
   setLastEmail: (email: string) => void;
   setUnread: (n: number) => void;
   setUser: (u: SessionUser | null) => void;
@@ -55,7 +61,11 @@ export const useApp = create<AppState>()(
       unread: 0,
       lang: 'fr',
       lastEmail: '',
+      themeMode: 'auto',
       setLang: (lang) => set({ lang }),
+      setThemeMode: (themeMode) => set({ themeMode }),
+      notifyMessages: true,
+      setNotifyMessages: (notifyMessages) => set({ notifyMessages }),
       setLastEmail: (lastEmail) => set({ lastEmail }),
       setUnread: (unread) => set({ unread }),
       setUser: (user) => set({ user }),
@@ -71,7 +81,7 @@ export const useApp = create<AppState>()(
       name: 'homemade-app',
       storage: createJSONStorage(() => AsyncStorage),
       // La session Supabase est gérée par supabase-js ; on ne persiste ici que les préférences locales.
-      partialize: (s) => ({ onboarded: s.onboarded, health: s.health, filters: s.filters, user: s.user, favorites: s.favorites, lang: s.lang, lastEmail: s.lastEmail }),
+      partialize: (s) => ({ onboarded: s.onboarded, health: s.health, filters: s.filters, user: s.user, favorites: s.favorites, lang: s.lang, lastEmail: s.lastEmail, themeMode: s.themeMode, notifyMessages: s.notifyMessages }),
     },
   ),
 );

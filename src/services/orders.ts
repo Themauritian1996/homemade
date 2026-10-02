@@ -44,6 +44,40 @@ export async function proposeSwap(mealId: string, offeredMealId: string, message
   return { orderId: row.order_id, conversationId: row.conversation_id };
 }
 
+/** Offre d'échange faite d'une simple photo : plat privé (jamais dans le fil), visible seulement par ce Cooker. */
+export interface SwapPhotoOffer {
+  photoPaths: string[];
+  title: string;
+  description: string;
+  cuisine: string;
+  ingredients: { name: string; allergens: string[]; source: 'ai' | 'cooker' }[];
+  declaredAllergens: string[];
+  mayContain: string[];
+  diets: string[];
+  pickup: { latitude: number; longitude: number };
+  pickupArea: string;
+  cookerAttestation: boolean;
+  aiAnalysisId?: string;
+  photoSource?: 'camera' | 'library';
+  photoTakenAt?: string | null;
+}
+
+/**
+ * Le serveur publie l'offre en privé (mêmes règles que publish_meal : attestation, allergènes recalculés), vérifie
+ * qu'elle est compatible avec le profil santé du Cooker (OFFER_CONFLICTS…) puis envoie la proposition.
+ */
+export async function proposeSwapWithPhoto(mealId: string, offer: SwapPhotoOffer, message: string): Promise<{ orderId: string; conversationId: string }> {
+  if (!offer.cookerAttestation) throw new Error('La validation des allergènes est obligatoire.');
+  if (DEMO_MODE) {
+    await new Promise((r) => setTimeout(r, 700));
+    return { orderId: 'o-demo-swap', conversationId: 'c2' };
+  }
+  const { data, error } = await requireSupabase().rpc('propose_swap_with_photo', { p_meal_id: mealId, p_offer: offer, p_message: message });
+  if (error) throw error;
+  const row = data as { order_id: string; conversation_id: string };
+  return { orderId: row.order_id, conversationId: row.conversation_id };
+}
+
 export type OrderAction = 'accepted' | 'declined' | 'ready' | 'picked_up' | 'cancelled';
 
 export interface OrderSummary {
@@ -52,14 +86,17 @@ export interface OrderSummary {
   status: string;
   cookerId: string;
   eaterId: string;
+  /** Le Cooker a partagé son adresse (bouton dans la conversation). */
+  addressSharedAt?: string | null;
+  offeredMealId?: string | null;
 }
 
 /** Commande liée à une conversation (lecture autorisée aux deux parties par la RLS). */
 export async function fetchOrder(orderId: string): Promise<OrderSummary | null> {
-  if (DEMO_MODE) return { id: orderId, kind: 'purchase', status: 'accepted', cookerId: 'cook-sofia', eaterId: 'demo-user' };
+  if (DEMO_MODE) return { id: orderId, kind: 'purchase', status: 'accepted', cookerId: 'cook-sofia', eaterId: 'demo-user', addressSharedAt: null };
   const { data, error } = await requireSupabase()
     .from('orders')
-    .select('id, kind, status, cookerId:cooker_id, eaterId:eater_id')
+    .select('id, kind, status, cookerId:cooker_id, eaterId:eater_id, addressSharedAt:address_shared_at, offeredMealId:offered_meal_id')
     .eq('id', orderId)
     .maybeSingle();
   if (error) throw error;
@@ -92,5 +129,12 @@ export async function submitReview(params: { orderId: string; rating: number; co
     p_tags: params.tags,
     p_sub_scores: params.subScores,
   });
+  if (error) throw error;
+}
+
+/** Le Cooker partage son adresse exacte avec l'autre personne (après acceptation, quand il le décide). */
+export async function shareAddress(orderId: string) {
+  if (DEMO_MODE) return;
+  const { error } = await requireSupabase().rpc('share_pickup_address', { p_order_id: orderId });
   if (error) throw error;
 }

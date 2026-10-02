@@ -1,12 +1,12 @@
 /** Feuille de filtres partagée (Fil + Carte) : distance, cuisine, prix, régimes, mode achat/échange, tri. */
 import Slider from '@react-native-community/slider';
 import React, { useEffect, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CUISINES, DIETS } from '@/data/allergens';
 import { formatPrice } from '@/lib/format';
 import { DEFAULT_FILTERS, FeedFilters } from '@/types';
-import { colors, radius, spacing, type } from '@/theme';
+import { colors, createStyles, radius, spacing, type } from '@/theme';
 import { Button, Chip, Divider } from './ui';
 
 import { t, tr } from '@/i18n';
@@ -133,7 +133,7 @@ export function FilterSheet({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   backdrop: { flex: 1, backgroundColor: colors.overlay },
   sheet: {
     maxHeight: '88%',
@@ -151,4 +151,4 @@ const styles = StyleSheet.create({
   segment: { flexDirection: 'row', backgroundColor: colors.surfaceAlt, borderRadius: radius.md, padding: 4 },
   segmentItem: { flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: radius.sm },
   segmentActive: { backgroundColor: colors.forest },
-});
+}));

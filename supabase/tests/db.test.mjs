@@ -184,8 +184,13 @@ await expectError('l’Eater ne peut pas accepter sa propre commande', () => q(`
 await as(cook.id);
 await q(`select public.transition_order($1, 'accepted')`, [po.order_id]);
 await as(eater.id);
+const hidden = (await q(`select public.get_pickup_details($1) as p`, [po.order_id]))[0].p;
+check('adresse cachée à l’acceptation tant que le Cooker ne l’a pas partagée', hidden === null);
+await as(cook.id);
+await q(`select public.share_pickup_address($1)`, [po.order_id]);
+await as(eater.id);
 const pickup = (await q(`select public.get_pickup_details($1) as p`, [po.order_id]))[0].p;
-check('adresse exacte révélée après acceptation', pickup && Math.abs(pickup.latitude - 45.5245) < 1e-6, JSON.stringify(pickup));
+check('adresse exacte révélée quand le Cooker la partage', pickup && Math.abs(pickup.latitude - 45.5245) < 1e-6, JSON.stringify(pickup));
 await as(cook.id);
 await q(`select public.transition_order($1, 'ready')`, [po.order_id]);
 await as(eater.id);
@@ -317,11 +322,76 @@ const [{ p: before }] = await q(`select public.get_pickup_details($1) as p`, [zS
 check('adresse invisible avant acceptation', before === null);
 await as(cook.id);
 await q(`select public.transition_order($1, 'accepted')`, [zSwap.order_id]);
+await q(`select public.share_pickup_address($1)`, [zSwap.order_id]);
 await as(eater.id);
 const [{ p: after }] = await q(`select public.get_pickup_details($1) as p`, [zSwap.order_id]);
-check('adresse écrite révélée après acceptation', after?.address === '123 rue Rachel Est, Montréal' && after?.postalCode === 'H2J 1A1', JSON.stringify(after));
+check('adresse écrite révélée après partage par le Cooker', after?.address === '123 rue Rachel Est, Montréal' && after?.postalCode === 'H2J 1A1', JSON.stringify(after));
 const [{ s: pay }] = await q(`select public.my_payment_status() as s`);
 check('statut des paiements lisible', typeof pay.hasAccount === 'boolean' && typeof pay.chargesEnabled === 'boolean', JSON.stringify(pay));
+
+// 11c) V10 : plat « en cours », échange avec photo, adresse partagée, avis par critère, conversations, favoris
+const [tiers] = await signup('tiers@test.ca', { display_name: 'Tiers', invite_code: 'VOISINS2026' });
+await as(cook.id);
+const [{ publish_meal: lastOne }] = await q(`select public.publish_meal($1::jsonb)`, [
+  JSON.stringify({ ...basePayload, photoPaths: [], title: 'Dernière part de tourtière', cuisine: 'quebecois', mode: 'swap', priceCents: null, portions: 1, diets: [], declaredAllergens: [],
+    ingredients: [{ name: 'Porc', allergens: [], source: 'cooker' }] }),
+]);
+await q(`select public.set_meal_photo_meta($1, now() - interval '2 days', 'library')`, [lastOne]);
+const [pm] = await q(`select photo_source, photo_taken_at < now() - interval '1 day' as old from public.meals where id = $1`, [lastOne]);
+check('photo : origine galerie et date de prise de vue enregistrées', pm.photo_source === 'library' && pm.old === true, JSON.stringify(pm));
+await as(eater.id);
+const offer = { ...basePayload, photoPaths: [], title: 'Muffins aux bleuets', cuisine: 'dessert', diets: [], declaredAllergens: [], photoSource: 'camera',
+  ingredients: [{ name: 'Bleuets', allergens: [], source: 'ai' }] };
+const [{ r: pso }] = await q(`select public.propose_swap_with_photo($1, $2::jsonb, 'Je propose mes muffins') as r`, [lastOne, JSON.stringify(offer)]);
+const [priv] = await q(`select is_private, status, photo_source from public.meals where id = $1`, [pso.offered_meal_id]);
+check('échange avec photo : offre privée créée (appareil photo)', priv.is_private && priv.status === 'published' && priv.photo_source === 'camera', JSON.stringify(priv));
+await as(tiers.id);
+let feedT = (await q(`select public.feed_meals(45.5231, -73.5817, 5000) as f`))[0].f;
+check('offre privée absente du fil', !feedT.meals.some((m) => m.id === pso.offered_meal_id));
+const [{ g: seenByTiers }] = await q(`select public.get_meal($1) as g`, [pso.offered_meal_id]);
+check('offre privée invisible pour un tiers', seenByTiers === null);
+await as(cook.id);
+const [{ g: seenByCook }] = await q(`select public.get_meal($1) as g`, [pso.offered_meal_id]);
+check('offre privée visible pour le Cooker sollicité', seenByCook?.isPrivate === true);
+await as(eater.id);
+const [{ n: privBefore }] = await q(`select count(*)::int as n from public.meals where is_private`);
+await expectError('échange avec photo refusé si l’offre contient un allergène de la Cooker (tahini ⇒ sésame)', () =>
+  q(`select public.propose_swap_with_photo($1, $2::jsonb, null)`, [sofiaMeal, JSON.stringify({ ...offer, title: 'Houmous', ingredients: [{ name: 'Tahini', allergens: [], source: 'ai' }] })]),
+  /OFFER_CONFLICTS_WITH_COOKER_HEALTH_PROFILE/);
+const [{ n: privAfter }] = await q(`select count(*)::int as n from public.meals where is_private`);
+check('refus : aucune offre privée orpheline', privAfter === privBefore);
+await as(cook.id);
+await q(`select public.transition_order($1, 'accepted')`, [pso.order_id]);
+await as(tiers.id);
+feedT = (await q(`select public.feed_meals(45.5231, -73.5817, 5000) as f`))[0].f;
+const pend = feedT.meals.find((m) => m.id === lastOne);
+check('dernière portion acceptée : plat toujours visible, « en cours »', pend?.pending === true, JSON.stringify(pend && { pending: pend.pending, left: pend.portionsLeft }));
+await as(eater.id);
+const [{ p: noAddr }] = await q(`select public.get_pickup_details($1) as p`, [pso.order_id]);
+check('adresse non partagée : l’Eater ne la voit pas', noAddr === null);
+const [{ id: convId }] = await q(`select id from public.conversations where order_id = $1`, [pso.order_id]);
+await expectError('conversation non supprimable pendant la transaction', () => q(`select public.hide_conversation($1)`, [convId]), /CONVERSATION_ACTIVE/);
+await q(`select public.transition_order($1, 'picked_up')`, [pso.order_id]);
+await as(tiers.id);
+feedT = (await q(`select public.feed_meals(45.5231, -73.5817, 5000) as f`))[0].f;
+check('après la remise : le plat disparaît du fil', !feedT.meals.some((m) => m.id === lastOne));
+await as(eater.id);
+await q(`select public.hide_conversation($1)`, [convId]);
+const [{ c: convs }] = await q(`select public.my_conversations() as c`);
+check('conversation supprimée de ma liste', !convs.some((c) => c.id === convId));
+await q(`select public.submit_review($1, 5::smallint, 'Délicieux', '{Savoureux}', '{"taste":5,"hygiene":4}'::jsonb)`, [pso.order_id]);
+await as(cook.id);
+await q(`select public.submit_review($1, 4::smallint, 'À l’heure', '{Ponctuel}', '{"punctuality":5,"communication":3}'::jsonb)`, [pso.order_id]);
+const [{ s: sumE }] = await q(`select public.review_summary($1, 'eater') as s`, [eater.id]);
+check('avis : fiabilité de l’Eater notée par critère', Number(sumE.criteria.punctuality) === 5 && sumE.count >= 1, JSON.stringify(sumE.criteria));
+const [{ s: sumC }] = await q(`select public.review_summary($1, 'cooker') as s`, [cook.id]);
+check('avis : synthèse Cooker par critère et répartition', Number(sumC.criteria.taste) === 5 && Object.keys(sumC.distribution).length === 5, JSON.stringify(sumC));
+const [{ t: fav1 }] = await q(`select public.toggle_favorite_person($1) as t`, [eater.id]);
+const [{ f: favs }] = await q(`select public.my_favorite_people() as f`);
+const [{ p: page }] = await q(`select public.person_page($1) as p`, [eater.id]);
+check('voisins favoris : ajout et page du voisin', fav1 === true && favs.length === 1 && page.isFavorite && page.tradedWith, JSON.stringify({ fav1, n: favs.length }));
+const [{ t: fav2 }] = await q(`select public.toggle_favorite_person($1) as t`, [eater.id]);
+check('voisins favoris : retrait', fav2 === false);
 
 // 12) Invitations désactivables par l'équipe
 await q(`update public.app_config set value = 'false' where key = 'invite_required'`);

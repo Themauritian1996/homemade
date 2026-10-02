@@ -66,7 +66,7 @@ export const cookers: Record<string, PublicProfile> = {
   },
 };
 
-const base = { currency: 'CAD' as const, status: 'published' as const, preparedAt: agoHours(3) };
+const base = { currency: 'CAD' as const, status: 'published' as const, preparedAt: agoHours(3), createdAt: agoHours(2), photoSource: 'camera' as const, photoTakenAt: agoHours(2) };
 
 export const meals: Meal[] = [
   {

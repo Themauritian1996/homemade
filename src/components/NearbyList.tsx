@@ -4,11 +4,11 @@
  */
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFeed } from '@/lib/useFeed';
 import { activeFilterCount, useApp } from '@/store/app';
-import { colors, fonts, radius, shadow, spacing, type } from '@/theme';
+import { colors, createStyles, fonts, radius, shadow, spacing, type } from '@/theme';
 import { FilterSheet } from './FilterSheet';
 import { MealCard } from './MealCard';
 import { Chip, EmptyState } from './ui';
@@ -78,7 +78,7 @@ export function NearbyList({ notice, onShowMap }: { notice?: string; onShowMap?:
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   roundBtn: {
     width: 48,
@@ -92,4 +92,4 @@ const styles = StyleSheet.create({
   dot: { position: 'absolute', top: 10, right: 11, width: 9, height: 9, borderRadius: 5, backgroundColor: colors.tomato },
   notice: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center', backgroundColor: colors.sage, padding: spacing.md, borderRadius: radius.md },
   label: { fontFamily: fonts.semibold },
-});
+}));

@@ -6,7 +6,7 @@ import React, { forwardRef, useCallback, useRef } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 import type { MapCommand } from '@/lib/mapHtml';
-import { colors } from '@/theme';
+import { colors, createStyles } from '@/theme';
 import { LeafletMapHandle, LeafletMapProps, useMapBridge } from './mapBridge';
 
 export type { LeafletMapHandle, LeafletMapProps } from './mapBridge';
@@ -52,8 +52,8 @@ export const LeafletMap = forwardRef<LeafletMapHandle, LeafletMapProps>(function
   );
 });
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   map: { flex: 1, backgroundColor: colors.surfaceAlt, overflow: 'hidden' },
   web: { flex: 1, backgroundColor: colors.surfaceAlt },
   loading: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, alignItems: 'center', justifyContent: 'center' },
-});
+}));

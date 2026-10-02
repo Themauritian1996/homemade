@@ -8,7 +8,7 @@ import { LanguageToggle } from '@/components/LanguageToggle';
 import { Button, Logo } from '@/components/ui';
 import { t } from '@/i18n';
 import { DEMO_MODE } from '@/lib/config';
-import { colors, fonts, radius, spacing, type } from '@/theme';
+import { colors, createStyles, fonts, radius, spacing, type } from '@/theme';
 
 const HERO = 'https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?w=1200&q=80&auto=format&fit=crop';
 
@@ -59,7 +59,7 @@ export default function Welcome() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   content: { flex: 1, paddingHorizontal: spacing.xxl },
   top: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   kicker: { ...type.label, color: 'rgba(255,255,255,0.75)', marginBottom: spacing.md },
@@ -79,4 +79,4 @@ const styles = StyleSheet.create({
   },
   valueText: { fontFamily: fonts.semibold, fontSize: 13, color: colors.onDark },
   demo: { ...type.caption, color: 'rgba(255,255,255,0.6)', textAlign: 'center', marginTop: spacing.lg },
-});
+}));
