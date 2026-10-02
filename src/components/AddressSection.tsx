@@ -4,12 +4,12 @@
  */
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Text, View } from 'react-native';
 import { t } from '@/i18n';
 import { config } from '@/lib/config';
 import { friendlyError } from '@/lib/errors';
 import { geocode, getMyAddress, normalizePostalCode, saveMyAddress } from '@/services/address';
-import { colors, radius, spacing, type } from '@/theme';
+import { colors, createStyles, radius, spacing, type } from '@/theme';
 import type { GeoPoint } from '@/types';
 import { PickupPicker } from './PickupPicker';
 import { Button, TextField } from './ui';
@@ -122,6 +122,6 @@ export function AddressSection() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   privacy: { flexDirection: 'row', gap: spacing.sm, backgroundColor: colors.sage, padding: spacing.md, borderRadius: radius.md },
-});
+}));

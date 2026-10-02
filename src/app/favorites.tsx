@@ -1,13 +1,13 @@
 /** Plats mis de côté (❤︎) sur ce téléphone. Les plats retirés ou épuisés sont signalés. */
 import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useState } from 'react';
-import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { FlatList, RefreshControl, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MealCard } from '@/components/MealCard';
 import { Button, EmptyState, ScreenHeader } from '@/components/ui';
 import { fetchMeal } from '@/services/meals';
 import { useApp } from '@/store/app';
-import { colors, radius, spacing, type } from '@/theme';
+import { colors, createStyles, radius, spacing, type } from '@/theme';
 import type { Meal } from '@/types';
 
 import { t } from '@/i18n';
@@ -70,6 +70,6 @@ export default function Favorites() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   gone: { backgroundColor: colors.surfaceAlt, borderRadius: radius.lg, padding: spacing.lg },
-});
+}));

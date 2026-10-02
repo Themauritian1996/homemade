@@ -1,13 +1,13 @@
 /** Commentaires des testeurs de la bêta (table beta_feedback, lue par l'équipe dans Supabase). */
 import { router } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, Chip, ScreenHeader } from '@/components/ui';
 import { friendlyError } from '@/lib/errors';
 import { FeedbackKind, sendFeedback } from '@/services/account';
 import { useApp } from '@/store/app';
-import { colors, fonts, radius, spacing, type } from '@/theme';
+import { colors, createStyles, fonts, radius, spacing, type } from '@/theme';
 
 import { t } from '@/i18n';
 const KINDS: { id: FeedbackKind; label: string; emoji: string; placeholder: string }[] = [
@@ -68,7 +68,7 @@ export default function Feedback() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   input: {
     minHeight: 160,
@@ -82,4 +82,4 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     textAlignVertical: 'top',
   },
-});
+}));

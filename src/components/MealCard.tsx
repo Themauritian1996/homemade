@@ -5,15 +5,18 @@ import { router } from 'expo-router';
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { cuisineById } from '@/data/allergens';
-import { formatDistance, formatPrice, timeLeft } from '@/lib/format';
-import { colors, fonts, radius, shadow, spacing, type } from '@/theme';
+import { formatDistance, formatPrice, relativeTime, timeLeft } from '@/lib/format';
+import { photoFreshness } from '@/lib/photoFreshness';
+import { colors, createStyles, fonts, radius, shadow, spacing, type } from '@/theme';
 import type { Meal } from '@/types';
 import { Avatar, RatingPill } from './ui';
 
 import { t, tr } from '@/i18n';
 export function MealCard({ meal, variant = 'full' }: { meal: Meal; variant?: 'full' | 'compact' }) {
   const cuisine = cuisineById(meal.cuisine);
-  const lowStock = meal.portionsLeft <= 1;
+  const lowStock = meal.portionsLeft <= 1 && !meal.pending;
+  const fresh = photoFreshness(meal);
+  const posted = meal.createdAt ? t('Publié {when}', { when: relativeTime(meal.createdAt) }) : null;
   const open = () => router.push({ pathname: '/meal/[id]', params: { id: meal.id } });
 
   if (variant === 'compact') {
@@ -26,10 +29,11 @@ export function MealCard({ meal, variant = 'full' }: { meal: Meal; variant?: 'fu
           </Text>
           <Text style={type.caption} numberOfLines={1}>
             {meal.cooker.displayName} · {formatDistance(meal.distanceKm)}
+            {posted ? ` · ${posted}` : ''}
           </Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
             <Text style={[type.price, { fontSize: 15 }]}>{formatPrice(meal.priceCents)}</Text>
-            <RatingPill rating={meal.cooker.cookerRating} count={meal.cooker.cookerRatingCount} compact />
+            {meal.pending ? <PendingBadge /> : <RatingPill rating={meal.cooker.cookerRating} count={meal.cooker.cookerRatingCount} compact />}
           </View>
         </View>
       </Pressable>
@@ -39,7 +43,7 @@ export function MealCard({ meal, variant = 'full' }: { meal: Meal; variant?: 'fu
   return (
     <Pressable onPress={open} style={({ pressed }) => [styles.card, pressed && { transform: [{ scale: 0.99 }] }]}>
       <View>
-        <Image source={{ uri: meal.photos[0] }} style={styles.image} contentFit="cover" transition={300} />
+        <Image source={{ uri: meal.photos[0] }} style={[styles.image, meal.pending && { opacity: 0.6 }]} contentFit="cover" transition={300} />
         <LinearGradient colors={['rgba(0,0,0,0.35)', 'transparent', 'transparent', 'rgba(0,0,0,0.55)']} style={StyleSheet.absoluteFill} />
         <View style={styles.topRow}>
           <View style={styles.glass}>
@@ -58,10 +62,14 @@ export function MealCard({ meal, variant = 'full' }: { meal: Meal; variant?: 'fu
           <View style={styles.pricePill}>
             <Text style={styles.priceText}>{formatPrice(meal.priceCents)}</Text>
           </View>
-          <View style={styles.timePill}>
-            <Ionicons name="time-outline" size={12} color={colors.onDark} />
-            <Text style={styles.glassText}>{timeLeft(meal.availableUntil)}</Text>
-          </View>
+          {meal.pending ? (
+            <PendingBadge />
+          ) : (
+            <View style={styles.timePill}>
+              <Ionicons name="time-outline" size={12} color={colors.onDark} />
+              <Text style={styles.glassText}>{timeLeft(meal.availableUntil)}</Text>
+            </View>
+          )}
         </View>
       </View>
       <View style={styles.body}>
@@ -78,6 +86,12 @@ export function MealCard({ meal, variant = 'full' }: { meal: Meal; variant?: 'fu
           <Ionicons name="location-outline" size={13} color={colors.muted} />
           <Text style={type.caption}>{formatDistance(meal.distanceKm)}</Text>
         </View>
+        {(posted || fresh) && (
+          <Text style={type.caption} numberOfLines={1}>
+            {[posted, fresh?.label].filter(Boolean).join(' · ')}
+          </Text>
+        )}
+        {meal.pending && <Text style={[type.caption, { color: colors.warning, fontFamily: fonts.semibold }]}>{t('Toutes les portions sont réservées : échange en cours.')}</Text>}
         {lowStock && (
           <Text style={[type.caption, { color: colors.tomato, fontFamily: fonts.semibold }]}>{t('Plus que')}{' '}{meal.portionsLeft}{' '}{t('portion — faites vite !')}</Text>
         )}
@@ -86,7 +100,18 @@ export function MealCard({ meal, variant = 'full' }: { meal: Meal; variant?: 'fu
   );
 }
 
-const styles = StyleSheet.create({
+/** Toutes les portions sont réservées (remise pas encore faite). */
+function PendingBadge() {
+  return (
+    <View style={styles.pending}>
+      <Ionicons name="hourglass-outline" size={12} color={colors.onDark} />
+      <Text style={styles.glassText}>{t('En cours')}</Text>
+    </View>
+  );
+}
+
+const styles = createStyles(() => ({
+  pending: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.warning, paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.pill },
   card: { backgroundColor: colors.surface, borderRadius: radius.xl, overflow: 'hidden', ...shadow.card },
   image: { width: '100%', aspectRatio: 16 / 10, backgroundColor: colors.surfaceAlt },
   topRow: { position: 'absolute', top: spacing.md, left: spacing.md, right: spacing.md, flexDirection: 'row', gap: spacing.sm },
@@ -124,4 +149,4 @@ const styles = StyleSheet.create({
     ...shadow.card,
   },
   compactImg: { width: 76, height: 76, borderRadius: radius.md, backgroundColor: colors.surfaceAlt },
-});
+}));

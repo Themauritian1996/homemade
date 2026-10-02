@@ -58,6 +58,15 @@ export interface Meal {
   distanceKm?: number;
   status: MealStatus;
   aiAssisted: boolean;
+  /** Date de publication. */
+  createdAt?: string;
+  /** Prise de vue de la photo (appareil photo = à la publication ; galerie = date EXIF si connue). Indice, non une preuve. */
+  photoTakenAt?: string | null;
+  photoSource?: 'camera' | 'library' | null;
+  /** Toutes les portions sont réservées par des commandes pas encore remises : visible mais « en cours ». */
+  pending?: boolean;
+  /** Offre d'échange privée (jamais dans le fil). */
+  isPrivate?: boolean;
 }
 
 export interface HealthProfile {
@@ -146,6 +155,9 @@ export interface Order {
 export interface Conversation {
   id: string;
   orderId?: string;
+  orderStatus?: OrderStatus | null;
+  /** Transaction terminée (ou annulée) : la conversation peut être supprimée ; elle disparaît seule après 48 h. */
+  closed?: boolean;
   mealTitle: string;
   mealPhoto?: string;
   other: PublicProfile;
@@ -171,5 +183,27 @@ export interface Review {
   rating: number;
   comment: string;
   tags: string[];
+  /** Notes par critère (Cooker : taste, hygiene, accuracy, punctuality · Eater : punctuality, communication, respect, reliability). */
+  subScores?: Record<string, number>;
   createdAt: string;
+}
+
+/** Synthèse des avis d'un membre pour un rôle (calculée par le serveur, avis révélés seulement). */
+export interface ReviewSummary {
+  count: number;
+  average: number | null;
+  distribution: Record<string, number>;
+  criteria: Record<string, number>;
+  tags: Record<string, number>;
+}
+
+/** Page publique d'un voisin. */
+export interface PersonPage {
+  profile: PublicProfile;
+  isFavorite: boolean;
+  /** Une transaction a déjà eu lieu entre nous (condition pour l'ajouter aux favoris). */
+  tradedWith: boolean;
+  cookerSummary: ReviewSummary;
+  eaterSummary: ReviewSummary;
+  meals: Meal[];
 }

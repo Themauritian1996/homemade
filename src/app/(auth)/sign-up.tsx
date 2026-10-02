@@ -7,7 +7,7 @@ import { Button, TextField } from '@/components/ui';
 import { DEMO_MODE } from '@/lib/config';
 import { friendlyError } from '@/lib/errors';
 import { checkInviteCode, signUp } from '@/services/auth';
-import { colors, fonts, spacing, type } from '@/theme';
+import { colors, createStyles, fonts, spacing, type } from '@/theme';
 
 import { t } from '@/i18n';
 export default function SignUp() {
@@ -116,4 +116,4 @@ export default function SignUp() {
   );
 }
 
-const styles = { link: { fontFamily: fonts.semibold, color: colors.forest, textDecorationLine: 'underline' as const } };
+const styles = createStyles(() => ({ link: { fontFamily: fonts.semibold, color: colors.forest, textDecorationLine: 'underline' as const } }));

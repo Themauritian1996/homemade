@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, Share, StyleSheet, Switch, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, Share, Switch, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AddressSection } from '@/components/AddressSection';
 import { LanguageToggle } from '@/components/LanguageToggle';
@@ -13,7 +13,7 @@ import { friendlyError } from '@/lib/errors';
 import { aiProviderLabel } from '@/services/ai';
 import { appVersion, deleteMyAccount, EditableProfile, exportMyData, loadAccount, saveProfile, saveSettings, Settings, uploadAvatar } from '@/services/account';
 import { useApp } from '@/store/app';
-import { colors, radius, spacing, type } from '@/theme';
+import { colors, createStyles, radius, spacing, type } from '@/theme';
 
 import { t } from '@/i18n';
 const RADII = [2, 5, 10, 15, 25];
@@ -25,6 +25,8 @@ export default function SettingsScreen() {
   const user = useApp((s) => s.user);
   const setUser = useApp((s) => s.setUser);
   const setFilters = useApp((s) => s.setFilters);
+  const themeMode = useApp((s) => s.themeMode);
+  const setThemeMode = useApp((s) => s.setThemeMode);
   const [profile, setProfile] = useState<EditableProfile | null>(null);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [savingProfile, setSavingProfile] = useState(false);
@@ -37,6 +39,7 @@ export default function SettingsScreen() {
       .then(({ profile: p, settings: s }) => {
         setProfile({ ...p, displayName: p.displayName || user.displayName });
         setSettings(s);
+        useApp.getState().setNotifyMessages(s.notifyMessages);
       })
       .catch((e) => Alert.alert(t('Chargement impossible'), friendlyError(e)));
   }, [user]);
@@ -54,6 +57,7 @@ export default function SettingsScreen() {
     const next = { ...settings, ...patch };
     setSettings(next);
     if (patch.defaultRadiusKm) setFilters({ radiusKm: patch.defaultRadiusKm });
+    if (patch.notifyMessages !== undefined) useApp.getState().setNotifyMessages(patch.notifyMessages);
     saveSettings(user.id, next).catch((e) => Alert.alert(t('Préférence non enregistrée'), friendlyError(e)));
   };
 
@@ -172,6 +176,21 @@ export default function SettingsScreen() {
           </View>
         </Section>
 
+        <Section title={t('Apparence')}>
+          <View style={styles.wrap}>
+            {(
+              [
+                ['auto', 'Automatique', 'phone-portrait-outline'],
+                ['light', 'Clair', 'sunny-outline'],
+                ['dark', 'Sombre', 'moon-outline'],
+              ] as const
+            ).map(([id, label, icon]) => (
+              <Chip key={id} label={t(label)} icon={icon} selected={themeMode === id} onPress={() => setThemeMode(id)} />
+            ))}
+          </View>
+          <Text style={type.caption}>{t('« Automatique » suit le réglage du téléphone.')}</Text>
+        </Section>
+
         <Section title={t('Recherche')}>
           <Text style={type.caption}>{t('Rayon utilisé par défaut dans le fil et sur la carte.')}</Text>
           <View style={styles.wrap}>
@@ -187,7 +206,9 @@ export default function SettingsScreen() {
             <Divider />
             <SwitchRow label={t('Nouveaux plats près de chez moi')} value={settings.notifyNewNearby} onChange={(v) => updateSettings({ notifyNewNearby: v })} />
           </Card>
-          <Text style={type.caption}>{t('Pendant la bêta, les nouveautés s\'affichent par des pastilles dans l\'app (onglet Messages). Les notifications sur le téléphone arrivent bientôt : vos choix seront respectés.')}</Text>
+          <Text style={type.caption}>
+            {t('Pendant la bêta, les notifications arrivent quand l’app est ouverte ou en arrière-plan récent. Les alertes avec l’app complètement fermée arrivent bientôt.')}
+          </Text>
         </Section>
 
         <Section title={t('Confidentialité et données (Loi 25)')}>
@@ -266,7 +287,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   switchRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56 },
   avatarBadge: {
@@ -282,4 +303,4 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: colors.bg,
   },
-});
+}));

@@ -12,10 +12,11 @@ import { formatDistance, formatPrice, relativeTime, timeLeft } from '@/lib/forma
 import { evaluateMeal } from '@/lib/safety';
 import { fetchCookerReviews, fetchMeal } from '@/services/meals';
 import { useApp } from '@/store/app';
-import { colors, radius, shadow, spacing, type } from '@/theme';
+import { colors, createStyles, radius, shadow, spacing, type } from '@/theme';
 import type { Meal, Review } from '@/types';
 
 import { t, tr } from '@/i18n';
+import { photoFreshness } from '@/lib/photoFreshness';
 import { SALES_ENABLED } from '@/services/payments';
 export default function MealDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -63,7 +64,8 @@ export default function MealDetail() {
   // Double contrôle : le fil est déjà filtré côté serveur, mais un plat peut être ouvert via un lien partagé.
   const verdict = evaluateMeal(meal, health);
   const cuisine = cuisineById(meal.cuisine);
-  const blocked = verdict.conflicts.length > 0 || verdict.traceConflicts.length > 0;
+  const blocked = verdict.conflicts.length > 0 || verdict.traceConflicts.length > 0 || Boolean(meal.pending);
+  const freshness = photoFreshness(meal);
   const mine = meal.cooker.id === me;
   const share = () =>
     Share.share({ message: t('{title} · {price} sur Homemade 🍽️\nOuvrir dans l’app : {link}', { title: meal.title, price: formatPrice(meal.priceCents), link: `homemade://meal/${meal.id}` }) }).catch(() => {});
@@ -102,8 +104,22 @@ export default function MealDetail() {
             <Badge label={`${cuisine.emoji} ${tr(cuisine)}`} />
             {meal.mode !== 'sale' && <Badge label={meal.mode === 'swap' ? t('Échange') : t('Achat ou échange')} tone="forest" icon="swap-horizontal" />}
             {meal.aiAssisted && <Badge label={t('Analyse IA vérifiée')} tone="saffron" icon="sparkles" />}
+            {meal.pending && <Badge label={t('En cours')} tone="saffron" icon="hourglass-outline" />}
           </View>
           <Text style={type.h1}>{meal.title}</Text>
+          {(meal.createdAt || freshness) && (
+            <Text style={type.caption}>
+              {[meal.createdAt ? t('Publié {when}', { when: relativeTime(meal.createdAt) }) : null, freshness?.label].filter(Boolean).join(' · ')}
+            </Text>
+          )}
+          {meal.pending && (
+            <View style={[styles.safety, { backgroundColor: colors.saffronSoft }]}>
+              <Ionicons name="hourglass-outline" size={20} color={colors.warning} />
+              <Text style={[type.body, { flex: 1, color: colors.ink }]}>
+                {t('Toutes les portions sont réservées : un échange est en cours. Le plat disparaîtra une fois remis, ou redeviendra disponible si l’échange est annulé.')}
+              </Text>
+            </View>
+          )}
           <View style={styles.metaRow}>
             <Meta icon="time-outline" label={t('Encore {0}', { 0: timeLeft(meal.availableUntil) })} />
             <Meta icon="location-outline" label={formatDistance(meal.distanceKm) || meal.pickupArea.split('—')[0]} />
@@ -127,7 +143,12 @@ export default function MealDetail() {
 
           <Text style={type.body}>{meal.description}</Text>
 
-          <Pressable style={styles.cooker}>
+          <Pressable
+            style={styles.cooker}
+            onPress={() => router.push({ pathname: '/people/[id]', params: { id: meal.cooker.id } })}
+            accessibilityRole="button"
+            accessibilityLabel={t('Voir le profil et les avis de {name}', { name: meal.cooker.displayName })}
+          >
             <Avatar uri={meal.cooker.avatarUrl} name={meal.cooker.displayName} size={52} verified={meal.cooker.isVerified} />
             <View style={{ flex: 1, gap: 4 }}>
               <Text style={type.bodyStrong}>{t('Cuisiné par')}{' '}{meal.cooker.displayName}</Text>
@@ -247,7 +268,7 @@ function Meta({ icon, label }: { icon: React.ComponentProps<typeof Ionicons>['na
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   hero: { width: '100%', height: 340, backgroundColor: colors.surfaceAlt },
   heroBar: { position: 'absolute', left: spacing.lg, right: spacing.lg, flexDirection: 'row', justifyContent: 'space-between' },
   heroBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', ...shadow.card },
@@ -287,5 +308,5 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.border,
   },
-});
+}));
 

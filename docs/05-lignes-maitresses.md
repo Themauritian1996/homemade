@@ -44,9 +44,16 @@ Le document à relire avant chaque décision produit ou technique. Si une demand
 | Code de lancement bêta | `VOISINS2026`, 100 inscriptions | `beta_invites` (migration bêta) |
 | Invitations par membre | 5 | `my_invite_code` |
 | Carte | MapLibre GL 5 embarqué + fond vectoriel OpenFreeMap « Liberty » (gratuit, sans clé, rendu façon Google Maps) ; repli automatique : Leaflet + OpenStreetMap, puis Esri — CARTO exige désormais une clé | `src/lib/mapHtml.ts`, `src/lib/maplibreInline.ts`, `src/lib/leafletInline.ts` |
-| Adresse du Cooker | Privée (`user_private`, illisible directement) ; publiquement : zone postale (3 caractères, ex. H2J) + point décalé ; révélée après acceptation (et paiement pour un achat) | `set_my_address`, `meals_public_zone`, `get_pickup_details` |
+| Adresse du Cooker | Privée (`user_private`, illisible directement) ; publiquement : zone postale (3 caractères, ex. H2J) + point décalé ; après acceptation, le Cooker la **partage d'un bouton** (sinon point de rencontre convenu dans le chat) | `set_my_address`, `meals_public_zone`, `share_pickup_address`, `get_pickup_details` |
 | Anti-contournement | Téléphones, courriels, liens et paiements hors app masqués dans le chat (serveur) ; motif de signalement « off_platform » | `mask_off_platform` |
 | Paiements | Stripe Connect Express (mode test d'abord) ; webhooks créés par le robot de déploiement | secrets `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY` |
+| Plat « en cours » | Dernières portions réservées par une commande pas encore remise : reste visible (grisé, en fin de liste) ; disparaît à la remise, revient si annulé | `meal_has_active_order`, `feed_meals` |
+| Offre d'échange par photo | Plat privé (jamais dans le fil), 1 portion, 72 h, visible seulement par le Cooker sollicité ; vérifié contre son profil santé ; archivé si refusé/annulé | `propose_swap_with_photo`, `orders_archive_private_offer` |
+| Fraîcheur de la photo | Indice, pas une preuve : appareil photo = prise à la publication ; galerie = date EXIF (≤ 24 h « du jour », ≤ 72 h « récente ») ; modifiable 30 min après publication | `set_meal_photo_meta`, `src/lib/photoFreshness.ts` |
+| Critères d'avis | Cooker : goût, hygiène, conformité, ponctualité · Eater : venu à l'heure, communication, respect, fiabilité | `src/data/reviewCriteria.ts`, `review_summary` |
+| Conversations terminées | Supprimables (balayage) ; masquées automatiquement 48 h après la fin ; effacées du serveur après 30 jours | `hide_conversation`, `my_conversations`, `purge_old_conversations` (pg_cron) |
+| Apparence | Automatique (suit le téléphone) · clair · sombre ; carte OpenFreeMap « dark » | `applyScheme`, `createStyles` (`src/theme`), `themeMode` |
+| Notifications | Locales (app ouverte ou en arrière-plan récent) pour messages et étapes de commande ; push app fermée = étape suivante (Firebase) | `src/lib/notifications.ts`, préférence `notify_messages` |
 | Objectif rappel allergènes IA | ≥ 98 % | jeu d'évaluation (docs/03) |
 | Objectif latence analyse | p95 < 8 s | idem |
 

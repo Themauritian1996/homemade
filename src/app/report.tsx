@@ -2,13 +2,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, ScreenHeader } from '@/components/ui';
 import { friendlyError } from '@/lib/errors';
 import { ReportReason, sendReport } from '@/services/account';
 import { useApp } from '@/store/app';
-import { colors, fonts, radius, spacing, type } from '@/theme';
+import { colors, createStyles, fonts, radius, spacing, type } from '@/theme';
 
 import { t } from '@/i18n';
 const REASONS: { id: ReportReason; label: string; hint: string }[] = [
@@ -90,7 +90,7 @@ export default function Report() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   urgent: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center', backgroundColor: colors.dangerSoft, padding: spacing.md, borderRadius: radius.md },
   option: {
     flexDirection: 'row',
@@ -116,4 +116,4 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     textAlignVertical: 'top',
   },
-});
+}));

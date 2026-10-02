@@ -59,7 +59,7 @@ export function subscribeToConversation(conversationId: string, onMessage: (m: M
   if (DEMO_MODE) return () => {};
   const sb = requireSupabase();
   const channel = sb
-    .channel(`conv:${conversationId}`)
+    .channel(`conv:${conversationId}:${Math.random().toString(36).slice(2)}`)
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${conversationId}` }, (payload) => {
       const r = payload.new as Record<string, string | boolean>;
       onMessage({
@@ -78,22 +78,44 @@ export function subscribeToConversation(conversationId: string, onMessage: (m: M
   };
 }
 
-/** Recalcule le nombre total de messages non lus (pastille de l'onglet Messages). */
-export async function refreshUnread() {
-  if (DEMO_MODE) return useApp.getState().setUnread(1);
+/** Recalcule le nombre total de messages non lus (pastille de l'onglet Messages) ; renvoie les conversations. */
+export async function refreshUnread(): Promise<Conversation[]> {
+  if (DEMO_MODE) {
+    useApp.getState().setUnread(1);
+    return [];
+  }
   const list = await fetchConversations();
   useApp.getState().setUnread(list.reduce((n, c) => n + Number(c.unread || 0), 0));
+  return list;
 }
 
 /** Tout nouveau message dans une de MES conversations (la RLS filtre le flux Realtime). */
-export function subscribeToMyMessages(onChange: () => void): () => void {
+export function subscribeToMyMessages(onChange: (m: Message) => void): () => void {
   if (DEMO_MODE) return () => {};
   const sb = requireSupabase();
   const channel = sb
-    .channel('my-messages')
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => onChange())
+    .channel(`my-messages-${Math.random().toString(36).slice(2)}`)
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
+      const r = payload.new as Record<string, string | boolean>;
+      onChange({
+        id: String(r.id),
+        conversationId: String(r.conversation_id),
+        senderId: String(r.sender_id),
+        body: String(r.body),
+        kind: r.kind as Message['kind'],
+        createdAt: String(r.created_at),
+        masked: r.masked === true,
+      });
+    })
     .subscribe();
   return () => {
     sb.removeChannel(channel);
   };
+}
+
+/** Supprime une conversation de ma liste (transaction terminée ou annulée ; sinon refusé par le serveur). */
+export async function hideConversation(conversationId: string) {
+  if (DEMO_MODE) return;
+  const { error } = await requireSupabase().rpc('hide_conversation', { p_conversation_id: conversationId });
+  if (error) throw error;
 }

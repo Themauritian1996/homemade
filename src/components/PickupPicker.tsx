@@ -5,8 +5,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import React, { useEffect, useRef, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { colors, radius, spacing, type } from '@/theme';
+import { Text, View } from 'react-native';
+import { colors, createStyles, radius, spacing, type } from '@/theme';
 import type { GeoPoint } from '@/types';
 import { LeafletMap, LeafletMapHandle } from './LeafletMap';
 import { Button, TextField } from './ui';
@@ -129,6 +129,6 @@ export function PickupPicker({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   mapBox: { height: 220, borderRadius: radius.lg, overflow: 'hidden', borderWidth: 1, borderColor: colors.border },
-});
+}));

@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { t } from '@/i18n';
 import { geocode } from '@/services/address';
 import { useApp } from '@/store/app';
-import { colors, fonts, radius, shadow, spacing, type } from '@/theme';
+import { colors, createStyles, fonts, radius, shadow, spacing, type } from '@/theme';
 import type { GeoPoint } from '@/types';
 import { Button } from './ui';
 
@@ -63,9 +63,9 @@ export function ZoneSearch({ visible, onClose, onFound }: { visible: boolean; on
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   backdrop: { ...StyleSheet.absoluteFill, backgroundColor: colors.overlay },
   sheet: { position: 'absolute', left: spacing.lg, right: spacing.lg, backgroundColor: colors.bg, borderRadius: radius.xl, padding: spacing.xl, gap: spacing.md, ...shadow.floating },
   field: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: spacing.md, minHeight: 50 },
   input: { flex: 1, fontFamily: fonts.regular, fontSize: 16, color: colors.ink, paddingVertical: spacing.sm },
-});
+}));

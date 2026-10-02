@@ -455,6 +455,9 @@ async function smoke(imagePath) {
     } catch (e) {
       console.log(`⚠ Carte vectorielle OpenFreeMap injoignable (l'app utilisera le repli OpenStreetMap) : ${e.message}`);
     }
+    // Mode sombre : style « dark » du même fournisseur.
+    const darkStyle = await fetch('https://tiles.openfreemap.org/styles/dark').catch(() => null);
+    console.log(`${darkStyle?.status === 200 ? '✓' : '⚠'} Carte sombre OpenFreeMap : HTTP ${darkStyle?.status ?? 'réseau'}`);
     for (const [label, tile] of [
       ['OpenStreetMap', 'https://tile.openstreetmap.org/14/4843/5850.png'],
       ['Esri (secours)', 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/14/5850/4843'],

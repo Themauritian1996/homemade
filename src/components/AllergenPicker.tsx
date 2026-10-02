@@ -1,7 +1,7 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { ALLERGENS, AllergenCode, allergenById } from '@/data/allergens';
-import { colors, fonts, radius, spacing } from '@/theme';
+import { colors, createStyles, fonts, radius, spacing } from '@/theme';
 import { Chip } from './ui';
 
 import { t, tr } from '@/i18n';
@@ -55,7 +55,7 @@ export function AllergenList({ codes, mayContain = [], conflicts = [] }: { codes
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   aiDot: {
     position: 'absolute',
@@ -73,4 +73,4 @@ const styles = StyleSheet.create({
   pillTrace: { backgroundColor: colors.saffronSoft },
   pillText: { fontFamily: fonts.medium, fontSize: 13, color: colors.inkSoft },
   none: { fontFamily: fonts.medium, fontSize: 14, color: colors.success },
-});
+}));

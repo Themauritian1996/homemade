@@ -1,13 +1,13 @@
 /** Bêta fermée : chaque membre dispose d'un code personnel pour inviter jusqu'à 5 voisins. */
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, Share, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, ScreenHeader } from '@/components/ui';
 import { config } from '@/lib/config';
 import { friendlyError } from '@/lib/errors';
 import { fetchMyInvite, MyInvite } from '@/services/account';
-import { colors, fonts, radius, shadow, spacing, type } from '@/theme';
+import { colors, createStyles, fonts, radius, shadow, spacing, type } from '@/theme';
 
 import { t } from '@/i18n';
 export default function Invite() {
@@ -78,9 +78,9 @@ export default function Invite() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   codeCard: { backgroundColor: colors.forest, borderRadius: radius.xl, padding: spacing.xxl, alignItems: 'center', gap: spacing.sm, ...shadow.floating },
   code: { fontFamily: fonts.bold, fontSize: 34, letterSpacing: 3, color: colors.onDark },
   steps: { backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.lg, gap: spacing.lg },
   stepIcon: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.sage, alignItems: 'center', justifyContent: 'center' },
-});
+}));

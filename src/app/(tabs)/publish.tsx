@@ -4,7 +4,6 @@
  */
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
@@ -37,29 +36,15 @@ import { ingredientsFromScan, mergeScan } from '@/lib/scanMerge';
 import { useAiAvailable } from '@/lib/useAiAvailable';
 import { aiAvailable, analyzeMealPhoto, preparePhoto, PreparedPhoto, scanText, uploadMealPhoto } from '@/services/ai';
 import { getMyAddress } from '@/services/address';
-import { publishMeal } from '@/services/meals';
+import { publishMeal, setMealPhotoMeta } from '@/services/meals';
+import { PickedPhoto, pickPhoto } from '@/lib/pickPhoto';
 import { fetchPaymentStatus, SALES_ENABLED } from '@/services/payments';
 import { useApp } from '@/store/app';
-import { colors, fonts, radius, shadow, spacing, type } from '@/theme';
+import { colors, createStyles, fonts, radius, shadow, spacing, type } from '@/theme';
 import type { AiMealAnalysis, AiTextScan, GeoPoint, MealIngredient, MealMode } from '@/types';
 
 import { t, tr } from '@/i18n';
 /** Sans clé Stripe, la vente est impossible côté serveur : la bêta se fait en mode échange. */
-
-/** Photo depuis l'appareil photo ou la galerie (permissions demandées au besoin). */
-async function pickImage(source: 'camera' | 'library', aspect?: [number, number]): Promise<string | null> {
-  const perm = source === 'camera' ? await ImagePicker.requestCameraPermissionsAsync() : await ImagePicker.requestMediaLibraryPermissionsAsync();
-  if (!perm.granted) {
-    Alert.alert(
-      t('Permission requise'),
-      source === 'camera' ? t('Autorisez l’appareil photo dans les réglages du téléphone.') : t('Autorisez l’accès aux photos dans les réglages du téléphone.'),
-    );
-    return null;
-  }
-  const opts: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], quality: 0.9, allowsEditing: Boolean(aspect), aspect };
-  const res = source === 'camera' ? await ImagePicker.launchCameraAsync(opts) : await ImagePicker.launchImageLibraryAsync(opts);
-  return res.canceled || !res.assets[0] ? null : res.assets[0].uri;
-}
 
 type Step = 'capture' | 'analyzing' | 'review' | 'done';
 
@@ -79,9 +64,13 @@ export default function Publish() {
   const [analysisId, setAnalysisId] = useState<string | null>(null);
   const user = useApp((s) => s.user);
 
+  const [photoMeta, setPhotoMeta] = useState<Omit<PickedPhoto, 'uri'> | null>(null);
+
   const pick = async (source: 'camera' | 'library') => {
-    const uri = await pickImage(source, [4, 3]);
-    if (!uri) return;
+    const picked = await pickPhoto(source, [4, 3]);
+    if (!picked) return;
+    const uri = picked.uri;
+    setPhotoMeta({ source: picked.source, takenAt: picked.takenAt });
     let prepared: PreparedPhoto;
     let path: string | null = null;
     try {
@@ -125,12 +114,13 @@ export default function Publish() {
     setAnalysis(null);
     setPhotoPath(null);
     setAnalysisId(null);
+    setPhotoMeta(null);
   };
 
   if (step === 'capture') return <CaptureStep onPick={pick} />;
   if (step === 'analyzing') return <AnalyzingStep uri={photo?.uri} />;
   if (step === 'done') return <DoneStep onAgain={reset} />;
-  return <ReviewStep photo={photo} analysis={analysis} photoPath={photoPath} analysisId={analysisId} onCancel={reset} onPublished={() => setStep('done')} />;
+  return <ReviewStep photo={photo} photoMeta={photoMeta} analysis={analysis} photoPath={photoPath} analysisId={analysisId} onCancel={reset} onPublished={() => setStep('done')} />;
 }
 
 // ───────────────────────────────────────── Capture
@@ -204,7 +194,7 @@ function AnalyzingStep({ uri }: { uri?: string }) {
   }, [scan, phases.length]);
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center', padding: spacing.xxl, gap: spacing.xxl }}>
+    <View style={{ flex: 1, backgroundColor: colors.night, alignItems: 'center', justifyContent: 'center', padding: spacing.xxl, gap: spacing.xxl }}>
       <View style={styles.scanFrame}>
         {uri && <Image source={{ uri }} style={StyleSheet.absoluteFill} contentFit="cover" />}
         <Animated.View
@@ -226,12 +216,14 @@ function AnalyzingStep({ uri }: { uri?: string }) {
 function ReviewStep({
   photo,
   analysis,
+  photoMeta,
   photoPath,
   analysisId,
   onCancel,
   onPublished,
 }: {
   photo: PreparedPhoto | null;
+  photoMeta: Omit<PickedPhoto, 'uri'> | null;
   analysis: AiMealAnalysis | null;
   photoPath: string | null;
   analysisId: string | null;
@@ -329,11 +321,11 @@ function ReviewStep({
     );
 
   const runScan = async (source: 'camera' | 'library') => {
-    const uri = await pickImage(source);
-    if (!uri) return;
+    const picked = await pickPhoto(source);
+    if (!picked) return;
     setScanning(true);
     try {
-      setScan(await scanText(uri, userId));
+      setScan(await scanText(picked.uri, userId));
     } catch (e) {
       Alert.alert(t('Lecture impossible'), t('{0}\n\nAjoutez les ingrédients à la main.', { 0: friendlyError(e, 'L’IA n’a pas pu lire cette photo.') }));
     } finally {
@@ -361,7 +353,7 @@ function ReviewStep({
     if (errors.length) return Alert.alert(t('À compléter'), errors.join('\n\n'));
     setPublishing(true);
     try {
-      await publishMeal({
+      const published = await publishMeal({
         aiAnalysisId: analysisId ?? undefined,
         photoPaths: photoPath ? [photoPath] : [],
         title: title.trim(),
@@ -379,6 +371,8 @@ function ReviewStep({
         pickupArea: pickupArea.trim() || t('Quartier communiqué après confirmation'),
         cookerAttestation: attested,
       });
+      // Fraîcheur de la photo (indice affiché aux voisins) : jamais bloquant.
+      if (photoMeta && photoPath) await setMealPhotoMeta(published.id, photoMeta.takenAt, photoMeta.source).catch(() => {});
       onPublished();
     } catch (e) {
       Alert.alert(t('Publication impossible'), friendlyError(e));
@@ -811,7 +805,7 @@ function DoneStep({ onAgain }: { onAgain: () => void }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   homeBox: { flexDirection: 'row', gap: spacing.md, backgroundColor: colors.sage, padding: spacing.lg, borderRadius: radius.lg },
   sellHint: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, padding: spacing.md, borderRadius: radius.md },
   likelyRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 44 },
@@ -884,4 +878,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: spacing.md,
   },
-});
+}));

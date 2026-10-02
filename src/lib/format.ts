@@ -6,6 +6,10 @@ const decimal = (s: string) => (getLang() === 'en' ? s : s.replace('.', ','));
 export const formatPrice = (cents: number | null | undefined) =>
   cents == null ? t('Échange') : new Intl.NumberFormat(locale(), { style: 'currency', currency: 'CAD' }).format(cents / 100);
 
+/** Prix compact pour la carte : « 5 $ » (sans décimales quand le prix est rond), « 4,50 $ » sinon. */
+export const formatPriceShort = (cents: number) =>
+  new Intl.NumberFormat(locale(), { style: 'currency', currency: 'CAD', minimumFractionDigits: cents % 100 ? 2 : 0, maximumFractionDigits: 2 }).format(cents / 100);
+
 export const formatDistance = (km?: number) => (km == null ? '' : km < 1 ? `${Math.round(km * 1000)} m` : `${decimal(km.toFixed(1))} km`);
 
 // Tronqué (pas arrondi) : 4,95 s'affiche 4,9 — un « 5,0 » doit être mérité.

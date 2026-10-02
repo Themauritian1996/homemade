@@ -7,7 +7,7 @@ import type { MealIngredient } from '@/types';
 import { expandAllergens } from './safety';
 import { t } from '@/i18n';
 
-const DIET_FORBIDS: Partial<Record<DietCode, AllergenCode[]>> = {
+export const DIET_FORBIDS: Partial<Record<DietCode, AllergenCode[]>> = {
   vegan: ['milk', 'egg', 'fish', 'crustacean', 'mollusc'],
   vegetarian: ['fish', 'crustacean', 'mollusc'],
   gluten_free: ['wheat', 'gluten'],

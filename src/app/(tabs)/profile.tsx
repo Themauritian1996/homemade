@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar, Badge, Card, Divider, ListRow } from '@/components/ui';
 import { allergenById } from '@/data/allergens';
@@ -12,7 +12,7 @@ import { signOut } from '@/services/auth';
 import { fetchMyProfile } from '@/services/profile';
 import type { PublicProfile } from '@/types';
 import { useApp } from '@/store/app';
-import { colors, fonts, radius, shadow, spacing, type } from '@/theme';
+import { colors, createStyles, fonts, radius, shadow, spacing, type } from '@/theme';
 
 import { t, tr } from '@/i18n';
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -39,6 +39,9 @@ export default function Profile() {
     isVerified: false,
     memberSince: new Date().toISOString(),
   };
+
+  // Mes avis détaillés (par critère) : même page que celle que voient les voisins.
+  const openReviews = (role: 'cooker' | 'eater') => user && router.push({ pathname: '/people/[id]', params: { id: user.id, role } });
 
   const confirmSignOut = () =>
     Alert.alert(t('Se déconnecter ?'), t('Vous pourrez vous reconnecter avec votre courriel et votre mot de passe.'), [
@@ -69,9 +72,9 @@ export default function Profile() {
 
       {/* Réputation bidirectionnelle : une note Cooker ET une note Eater */}
       <View style={styles.stats}>
-        <Stat label={t('Note Cooker')} value={formatRating(p.cookerRating)} sub={t('{n} avis', { n: p.cookerRatingCount })} icon="restaurant" />
+        <Stat label={t('Note Cooker')} value={formatRating(p.cookerRating)} sub={t('{n} avis', { n: p.cookerRatingCount })} icon="restaurant" onPress={() => openReviews('cooker')} />
         <View style={styles.statDivider} />
-        <Stat label={t('Note Eater')} value={formatRating(p.eaterRating)} sub={t('{n} avis', { n: p.eaterRatingCount })} icon="happy" />
+        <Stat label={t('Note Eater')} value={formatRating(p.eaterRating)} sub={t('{n} avis', { n: p.eaterRatingCount })} icon="happy" onPress={() => openReviews('eater')} />
         <View style={styles.statDivider} />
         <Stat label={t('Repas sauvés')} value={String(p.mealsShared ?? 0)} sub={t('portions partagées')} icon="leaf" />
       </View>
@@ -91,13 +94,20 @@ export default function Profile() {
           onPress={() => router.push('/my-meals')}
         />
         <Divider />
-        <ListRow icon="receipt-outline" title={t('Mes commandes et échanges')} subtitle={t('Conversations, avis à laisser')} onPress={() => router.push('/inbox')} />
+        <ListRow icon="receipt-outline" title={t('Mes commandes et échanges')} subtitle={t('Conversations, avis à laisser')} onPress={() => router.navigate('/inbox')} />
         <Divider />
         <ListRow
           icon="heart-outline"
           title={t('Mes favoris')}
           subtitle={favorites.length ? t('{0} plat(s) mis de côté', { 0: favorites.length }) : t('Touchez ♡ sur un plat pour le retrouver ici')}
           onPress={() => router.push('/favorites')}
+        />
+        <Divider />
+        <ListRow
+          icon="star-outline"
+          title={t('Voisins favoris')}
+          subtitle={t('Les personnes avec qui vous aimez échanger')}
+          onPress={() => router.push('/neighbours')}
         />
         <Divider />
         <ListRow icon="card-outline" title={t('Paiements et adresse')} subtitle={t('Vendre, acheter, adresse de cueillette privée')} onPress={() => router.push('/settings')} />
@@ -143,18 +153,23 @@ export default function Profile() {
   );
 }
 
-function Stat({ label, value, sub, icon }: { label: string; value: string; sub: string; icon: IconName }) {
+function Stat({ label, value, sub, icon, onPress }: { label: string; value: string; sub: string; icon: IconName; onPress?: () => void }) {
   return (
-    <View style={{ flex: 1, alignItems: 'center', gap: 2, paddingHorizontal: spacing.xs }}>
+    <Pressable
+      onPress={onPress}
+      disabled={!onPress}
+      accessibilityRole={onPress ? 'button' : undefined}
+      style={({ pressed }) => [{ flex: 1, alignItems: 'center', gap: 2, paddingHorizontal: spacing.xs }, pressed && { opacity: 0.7 }]}
+    >
       <Ionicons name={icon} size={18} color={colors.tomato} />
       <Text style={[type.h2, { fontSize: 22 }]}>{value}</Text>
       <Text style={[type.caption, { fontFamily: fonts.semibold, color: colors.ink, textAlign: 'center' }]}>{label}</Text>
       <Text style={[type.caption, { textAlign: 'center' }]}>{sub}</Text>
-    </View>
+    </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   header: { flexDirection: 'row', gap: spacing.lg, alignItems: 'center' },
   stats: { flexDirection: 'row', backgroundColor: colors.surface, borderRadius: radius.xl, paddingVertical: spacing.lg, ...shadow.card },
   statDivider: { width: 1, backgroundColor: colors.border, marginVertical: spacing.sm },
@@ -169,4 +184,4 @@ const styles = StyleSheet.create({
   },
   inviteIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
   logout: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
-});
+}));

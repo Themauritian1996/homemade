@@ -1,11 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import React from 'react';
-import { ColorValue, Platform, StyleSheet, View } from 'react-native';
+import { ColorValue, Platform, View } from 'react-native';
 import { useSessionSync } from '@/lib/useSessionSync';
 import { t } from '@/i18n';
 import { useApp } from '@/store/app';
-import { colors, fonts, radius, shadow } from '@/theme';
+import { colors, createStyles, fonts, radius, shadow } from '@/theme';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -69,7 +69,7 @@ export default function TabsLayout() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   indicator: { width: 56, height: 30, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
   indicatorActive: { backgroundColor: colors.sage },
   fab: {
@@ -84,4 +84,4 @@ const styles = StyleSheet.create({
     borderColor: colors.surface,
     ...shadow.floating,
   },
-});
+}));

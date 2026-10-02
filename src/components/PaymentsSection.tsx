@@ -6,12 +6,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useCallback, useEffect, useState } from 'react';
 import * as WebBrowser from 'expo-web-browser';
-import { ActivityIndicator, Alert, AppState, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, AppState, Text, View } from 'react-native';
 import { t } from '@/i18n';
 import { config } from '@/lib/config';
 import { friendlyError } from '@/lib/errors';
 import { fetchPaymentStatus, PAYMENTS_TEST_MODE, paymentsLink, PaymentStatus, SALES_ENABLED } from '@/services/payments';
-import { colors, fonts, radius, spacing, type } from '@/theme';
+import { colors, createStyles, fonts, radius, spacing, type } from '@/theme';
 import { Badge, Button, Card } from './ui';
 
 const pct = (r: number) => `${Math.round(r * 100)} %`;
@@ -113,7 +113,7 @@ export function PaymentsSection({ refreshKey }: { refreshKey?: string }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   test: { flexDirection: 'row', gap: spacing.sm, backgroundColor: colors.saffronSoft, padding: spacing.md, borderRadius: radius.md },
-});
+}));

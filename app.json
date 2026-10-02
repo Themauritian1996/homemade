@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "app.homemade.mobile",
@@ -64,6 +64,12 @@
         {
           "merchantIdentifier": "merchant.app.homemade",
           "enableGooglePay": true
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#E2553B"
         }
       ]
     ],

@@ -7,17 +7,18 @@ import { useStripe } from '@stripe/stripe-react-native';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MealCard } from '@/components/MealCard';
-import { Button, Divider, IconButton } from '@/components/ui';
+import { SwapPhotoOffer } from '@/components/SwapPhotoOffer';
+import { Button, Chip, Divider, IconButton } from '@/components/ui';
 import { config, DEMO_MODE } from '@/lib/config';
 import { formatPrice } from '@/lib/format';
 import { fetchMeal, fetchMySwappableMeals } from '@/services/meals';
 import { useApp } from '@/store/app';
 import { friendlyError } from '@/lib/errors';
-import { createPurchase, proposeSwap } from '@/services/orders';
-import { colors, fonts, radius, spacing, type } from '@/theme';
+import { createPurchase, proposeSwap, proposeSwapWithPhoto, SwapPhotoOffer as PhotoOffer } from '@/services/orders';
+import { colors, createStyles, fonts, radius, spacing, type } from '@/theme';
 import type { Meal } from '@/types';
 
 import { t } from '@/i18n';
@@ -32,10 +33,20 @@ export default function OrderModal() {
   const userId = useApp((st) => st.user?.id);
   const [myMeals, setMyMeals] = useState<Meal[]>([]);
   const [loading, setLoading] = useState(false);
+  // Échange : un plat déjà publié, ou une simple photo (offre privée, visible par ce Cooker seulement).
+  const [offerKind, setOfferKind] = useState<'photo' | 'meal'>('photo');
+  const [photoOffer, setPhotoOffer] = useState<PhotoOffer | null>(null);
 
   useEffect(() => {
     fetchMeal(id).then(setMeal);
-    if (kind === 'swap' && userId) fetchMySwappableMeals(userId).then((l) => setMyMeals(l.filter((m) => m.id !== id))).catch(() => {});
+    if (kind === 'swap' && userId)
+      fetchMySwappableMeals(userId)
+        .then((l) => {
+          const mine = l.filter((m) => m.id !== id);
+          setMyMeals(mine);
+          if (mine.length) setOfferKind('meal');
+        })
+        .catch(() => {});
   }, [id, kind, userId]);
 
   if (!meal) return null;
@@ -75,10 +86,11 @@ export default function OrderModal() {
   };
 
   const swap = async () => {
-    if (!offered) return Alert.alert(t('Choisissez un plat'), t('Sélectionnez le plat que vous proposez en échange.'));
+    if (offerKind === 'meal' && !offered) return Alert.alert(t('Choisissez un plat'), t('Sélectionnez le plat que vous proposez en échange.'));
+    if (offerKind === 'photo' && !photoOffer) return Alert.alert(t('À compléter'), t('Ajoutez une photo, un nom, les ingrédients, puis cochez la vérification.'));
     setLoading(true);
     try {
-      const res = await proposeSwap(meal.id, offered, note);
+      const res = offerKind === 'photo' && photoOffer ? await proposeSwapWithPhoto(meal.id, photoOffer, note) : await proposeSwap(meal.id, offered!, note);
       Alert.alert(t('Proposition envoyée'), t('{0} recevra votre offre d\'échange.', { 0: meal.cooker.displayName }));
       router.replace({ pathname: '/chat/[id]', params: { id: res.conversationId } });
     } catch (e) {
@@ -133,9 +145,16 @@ export default function OrderModal() {
         ) : (
           <>
             <Text style={type.h3}>{t('Quel plat proposez-vous ?')}</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+              <Chip label={t('Une photo de mon plat')} icon="camera-outline" selected={offerKind === 'photo'} onPress={() => setOfferKind('photo')} />
+              <Chip label={t('Un plat publié ({0})', { 0: myMeals.length })} icon="restaurant-outline" selected={offerKind === 'meal'} onPress={() => setOfferKind('meal')} />
+            </View>
+            {offerKind === 'photo' ? (
+              <SwapPhotoOffer onChange={setPhotoOffer} />
+            ) : (
             <View style={{ gap: spacing.md }}>
               {myMeals.length === 0 && (
-                <Text style={type.body}>{t('Vous n\'avez aucun plat publié en mode « Échange ». Publiez d\'abord un plat (onglet Publier, mode Échange ou Les deux), puis revenez ici.')}</Text>
+                <Text style={type.body}>{t('Aucun plat publié en mode « Échange ». Proposez plutôt une photo de votre plat.')}</Text>
               )}
               {myMeals.map((m) => (
                 <Pressable key={m.id} onPress={() => setOffered(m.id)} style={[styles.offer, offered === m.id && { borderColor: colors.forest, backgroundColor: colors.sage }]}>
@@ -146,6 +165,7 @@ export default function OrderModal() {
                 </Pressable>
               ))}
             </View>
+            )}
             <TextInput
               value={note}
               onChangeText={setNote}
@@ -166,7 +186,7 @@ export default function OrderModal() {
         {kind === 'purchase' ? (
           <Button title={t('Payer {0}', { 0: formatPrice(subtotal + serviceFee) })} variant="accent" icon="card-outline" onPress={pay} loading={loading} />
         ) : (
-          <Button title={t('Envoyer la proposition')} icon="swap-horizontal" onPress={swap} loading={loading} disabled={!offered} />
+          <Button title={t('Envoyer la proposition')} icon="swap-horizontal" onPress={swap} loading={loading} disabled={offerKind === 'meal' ? !offered : !photoOffer} />
         )}
       </View>
     </View>
@@ -182,7 +202,7 @@ function Line({ label, value, strong }: { label: string; value: string; strong?:
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.xl, paddingBottom: spacing.sm },
   summary: { flexDirection: 'row', gap: spacing.md, alignItems: 'center' },
   thumb: { width: 72, height: 72, borderRadius: radius.md },
@@ -193,4 +213,4 @@ const styles = StyleSheet.create({
   offer: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.xs, paddingRight: spacing.md, borderRadius: radius.lg, borderWidth: 1.5, borderColor: 'transparent' },
   note: { minHeight: 80, backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, fontFamily: fonts.regular, fontSize: 15, color: colors.ink, borderWidth: 1, borderColor: colors.border, textAlignVertical: 'top' },
   footer: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: spacing.xl, paddingTop: spacing.md, backgroundColor: colors.bg, borderTopWidth: 1, borderTopColor: colors.border },
-});
+}));

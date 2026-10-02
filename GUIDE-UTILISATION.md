@@ -209,7 +209,7 @@ Quand je modifie l'app, une nouvelle version apparaît au même lien (**releases
 2. Si les codes par courriel sont activés (étape 2-C) : entre le **code à 6 chiffres** reçu par courriel.
 3. **Bienvenue à la table** : indique si tu veux un régime (végé, halal…) ou une allergie — facultatif. **Continuer**. Si l'app demande ta position, accepte : elle sert à trouver les plats près de toi.
 4. Tu restes connecté sur ton téléphone jusqu'à **Se déconnecter** ; ton courriel est pré-rempli à la connexion suivante, et Android propose d'enregistrer le mot de passe.
-5. **Profil → Paiements et adresse** : entre ton **adresse et ton code postal** (privés), touche **Trouver sur la carte**, vérifie l'épingle, **Enregistrer**. Tes plats seront placés là automatiquement. Tes voisins voient seulement ta **zone postale** (ex. `H2J`) et un point approximatif ; l'adresse exacte apparaît dans le chat de l'acheteur **seulement après ton acceptation** (et son paiement, pour un achat), avec un bouton **Itinéraire**.
+5. **Profil → Paiements et adresse** : entre ton **adresse et ton code postal** (privés), touche **Trouver sur la carte**, vérifie l'épingle, **Enregistrer**. Tes plats seront placés là automatiquement. Tes voisins voient seulement ta **zone postale** (ex. `H2J`) et un point approximatif ; après ton acceptation, c'est **toi** qui décides : bouton **Partager mon adresse** dans le chat (l'autre personne voit alors l'adresse et un bouton **Itinéraire**), ou convenez d'un **point de rencontre** (parc, métro…).
 
 > 🔒 **Tout passe par l'app** : dans le chat, les numéros de téléphone, courriels, liens et demandes de paiement hors app (Interac, comptant…) sont **masqués automatiquement**. Un membre qui insiste peut être signalé (« Paiement demandé hors de l'app »).
 
@@ -219,8 +219,8 @@ Quand je modifie l'app, une nouvelle version apparaît au même lien (**releases
 | 🍴 **Découvrir** | Les plats et **meal preps** autour de toi, avec une **barre de recherche** (plat, ingrédient, quartier) et des catégories (Meal prep, Bol santé, Déjeuner…). Tes préférences alimentaires sont appliquées automatiquement. |
 | 🗺️ **Carte** | Carte interactive (OpenStreetMap, sans clé) : touche une pastille de prix pour voir le plat. Touche la barre du haut pour **chercher une zone** (code postal comme `H2J`, quartier ou adresse). ☰ liste, ⚙️ filtres, ➤ ta position. |
 | 📷 **Publier** | Photographier ton plat. L'IA remplit l'annonce et peut **lire une étiquette ou une recette**. |
-| 💬 **Messages** | Discuter, accepter un échange, confirmer la récupération. Une pastille rouge indique les messages non lus. |
-| 👤 **Profil** | Notes, profil santé, **Mes plats**, **Mes favoris**, **Invitez vos voisins**, **Paramètres** (photo, quartier, rayon, données), **Aide**, **Donner mon avis**. |
+| 💬 **Messages** | Discuter, accepter un échange, partager ton adresse, confirmer la récupération. Une pastille rouge indique les messages non lus. Une conversation **terminée** se supprime en la **glissant vers la gauche** (sinon elle disparaît seule après 48 h). |
+| 👤 **Profil** | Notes (touche **Note Cooker / Eater** pour voir les avis et les critères), profil santé, **Mes plats**, **Mes favoris**, **Voisins favoris**, **Invitez vos voisins**, **Paramètres** (photo, adresse, rayon, **apparence claire/sombre**, notifications, données), **Aide**, **Donner mon avis**. |
 
 ### Publier un plat avec l'IA
 > Avec l'**APK** (méthode A), l'analyse passe par l'IA **en ligne et gratuite** (Gemini). Si elle est indisponible, le formulaire s'ouvre vide et tu remplis toi-même le titre et les ingrédients.
@@ -243,11 +243,14 @@ Quand je modifie l'app, une nouvelle version apparaît au même lien (**releases
 
 ### Proposer un échange
 1. Ouvre un plat (Découvrir ou Carte) → **Échanger**.
-2. Choisis un de **tes** plats publiés en mode Échange → écris un petit mot → **Envoyer la proposition**.
-3. Le chat s'ouvre. Le Cooker voit **Accepter / Refuser** en haut de la conversation.
-4. Une fois accepté, l'adresse exacte devient visible. Coordonnez l'heure dans le chat.
-5. Après la récupération : **J'ai récupéré** → donne une **note** et un avis.
-6. Les deux avis s'affichent **en même temps**, quand chacun a noté : personne ne voit la note de l'autre avant d'avoir donné la sienne.
+2. Deux choix :
+   - **Une photo de mon plat** (sans le publier) : photo ou galerie → l'IA remplit le nom, les ingrédients et les allergènes → tu vérifies et coches → le plat n'est visible **que par ce Cooker**. Homemade vérifie qu'il convient à son profil santé avant d'envoyer l'offre.
+   - **Un plat publié** : choisis un de tes plats en mode Échange.
+3. Écris un petit mot → **Envoyer la proposition**. Le chat s'ouvre ; le Cooker voit **Accepter / Refuser**.
+4. Une fois accepté, le plat apparaît **« En cours »** pour les autres. Le Cooker **partage son adresse** d'un bouton, ou vous convenez d'un point de rencontre.
+5. À la remise : **J'ai récupéré**. Pour un achat, c'est **à ce moment** que le paiement est débité (avant, il est seulement pré-autorisé). Le plat disparaît alors de la recherche.
+6. Chacun note l'autre : l'Eater note le plat (goût, hygiène…), le Cooker note l'Eater (ponctualité, communication, respect, fiabilité). Les deux avis s'affichent **en même temps** (ou après 7 jours) : personne ne voit la note de l'autre avant d'avoir donné la sienne.
+7. Ensuite, l'app propose de **supprimer la conversation**, et tu peux ajouter la personne à tes **voisins favoris** (touche son nom en haut du chat).
 
 ### Gérer tes plats, signaler, donner ton avis
 - **Profil → Mes plats** : état de chaque annonce, portions restantes, demandes en cours, bouton **Retirer**.

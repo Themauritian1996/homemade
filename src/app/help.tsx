@@ -2,10 +2,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
-import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, ScreenHeader } from '@/components/ui';
-import { colors, radius, spacing, type } from '@/theme';
+import { colors, createStyles, radius, spacing, type } from '@/theme';
 
 import { t } from '@/i18n';
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -106,9 +106,9 @@ export default function Help() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   topic: { backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.lg },
   topicHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 44 },
   icon: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.sage, alignItems: 'center', justifyContent: 'center' },
   emergency: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.dangerSoft, borderRadius: radius.lg, padding: spacing.lg },
-});
+}));

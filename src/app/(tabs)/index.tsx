@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import * as Location from 'expo-location';
-import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FilterSheet } from '@/components/FilterSheet';
 import { MealCard } from '@/components/MealCard';
@@ -12,7 +12,7 @@ import { CUISINES, cuisineById } from '@/data/allergens';
 import { t, tr } from '@/i18n';
 import { useFeed } from '@/lib/useFeed';
 import { activeFilterCount, useApp } from '@/store/app';
-import { colors, fonts, radius, shadow, spacing, type } from '@/theme';
+import { colors, createStyles, fonts, radius, shadow, spacing, type } from '@/theme';
 
 const normalize = (s: string) =>
   s
@@ -80,7 +80,7 @@ export default function Discover() {
           icon="chatbubbles-outline"
           accessibilityLabel={unread ? t('{0} message(s) non lu(s)', { 0: unread }) : t('Messages')}
           badge={unread}
-          onPress={() => router.push('/inbox')}
+          onPress={() => router.navigate('/inbox')}
         />
       </View>
 
@@ -140,7 +140,7 @@ export default function Discover() {
             <Text style={[type.h3, { color: colors.onDark }]}>{t('La table du quartier 🍲')}</Text>
             <Text style={[type.caption, { color: 'rgba(255,255,255,0.85)' }]}>{t('Des voisins qui aiment cuisiner partagent leurs plats et leurs meal preps. Chaque portion partagée, c\'est un repas sauvé du gaspillage.')}</Text>
           </View>
-          <Pressable style={styles.communityBtn} onPress={() => router.push('/publish')} accessibilityRole="button" accessibilityLabel={t('Partager un plat')}>
+          <Pressable style={styles.communityBtn} onPress={() => router.navigate('/publish')} accessibilityRole="button" accessibilityLabel={t('Partager un plat')}>
             <Ionicons name="add" size={22} color={colors.forest} />
           </Pressable>
         </View>
@@ -172,7 +172,7 @@ export default function Discover() {
       <SectionHeader
         title={query ? t('Résultats · {0}', { 0: meals.length }) : t('Près de vous · {0}', { 0: meals.length })}
         action={t('Voir la carte')}
-        onAction={() => router.push('/map')}
+        onAction={() => router.navigate('/map')}
       />
     </View>
   );
@@ -201,7 +201,7 @@ export default function Discover() {
               body={t('Soyez le premier à partager un plat ou votre meal prep, ou invitez vos voisins qui aiment cuisiner. Vous pouvez aussi élargir la distance.')}
             >
               <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md }}>
-                <Button title={t('Publier un plat')} size="md" variant="accent" icon="camera" onPress={() => router.push('/publish')} />
+                <Button title={t('Publier un plat')} size="md" variant="accent" icon="camera" onPress={() => router.navigate('/publish')} />
                 <Button title={t('Inviter')} size="md" variant="secondary" icon="gift-outline" onPress={() => router.push('/invite')} />
               </View>
             </EmptyState>
@@ -214,7 +214,7 @@ export default function Discover() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles(() => ({
   topBar: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   search: {
     flexDirection: 'row',
@@ -251,4 +251,4 @@ const styles = StyleSheet.create({
   community: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.forest, padding: spacing.lg, borderRadius: radius.lg, ...shadow.card },
   communityBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
   prefs: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: -spacing.sm, minHeight: 32 },
-});
+}));

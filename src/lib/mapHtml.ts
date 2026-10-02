@@ -11,7 +11,7 @@
  *   carte → app : { type: 'ready' } · { type: 'tiles' } (premier fond affiché) · { type: 'select', id } · { type: 'pick', lat, lng } · { type: 'error', reason }
  */
 import type { GeoPoint } from '@/types';
-import { colors } from '@/theme';
+import { colors, getScheme } from '@/theme';
 import { LEAFLET_CSS, LEAFLET_JS } from './leafletInline';
 import { MAPLIBRE_CSS, MAPLIBRE_JS } from './maplibreInline';
 
@@ -22,6 +22,10 @@ export interface MapMarker {
   label: string;
   /** Affiche le pictogramme d'échange. */
   swap?: boolean;
+  /** Type de plat (emoji de la cuisine). */
+  emoji?: string;
+  /** Toutes les portions sont réservées : puce grisée. */
+  pending?: boolean;
 }
 
 export interface MapState {
@@ -43,6 +47,8 @@ export type MapEvent = { type: 'ready' } | { type: 'tiles' } | { type: 'select';
 
 /** Fond vectoriel OpenFreeMap (gratuit, sans clé ni limite, données OpenStreetMap). */
 const VECTOR_STYLE = 'https://tiles.openfreemap.org/styles/liberty';
+/** Mode sombre : style « dark » d'OpenFreeMap ; le raster de secours est assombri par filtre. */
+const VECTOR_STYLE_DARK = 'https://tiles.openfreemap.org/styles/dark';
 /** Repli raster : OpenStreetMap standard, puis Esri World Street Map (sans clé). */
 const TILES = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 const ATTRIBUTION = '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
@@ -53,6 +59,8 @@ const VECTOR_TIMEOUT_MS = 9000;
 
 export function buildMapHtml(center: GeoPoint, zoom: number): string {
   const init = JSON.stringify({ lat: center.latitude, lng: center.longitude, zoom });
+  const dark = getScheme() === 'dark';
+  const ground = dark ? '#22221F' : '#EEF0EA';
   return `<!doctype html>
 <html lang="fr"><head>
 <meta charset="utf-8">
@@ -60,16 +68,19 @@ export function buildMapHtml(center: GeoPoint, zoom: number): string {
 <style>${MAPLIBRE_CSS}</style>
 <style>${LEAFLET_CSS}</style>
 <style>
-  html, body, #map { margin: 0; height: 100%; background: #EEF0EA; }
+  html, body, #map { margin: 0; height: 100%; background: ${ground}; }
   #map, .leaflet-container { font-family: -apple-system, Roboto, "Segoe UI", sans-serif; -webkit-tap-highlight-color: transparent; }
-  .leaflet-container { background: #EEF0EA; }
+  .leaflet-container { background: ${ground}; }
+  ${dark ? '.leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9); }' : ''}
   .leaflet-control-attribution, .maplibregl-ctrl-attrib { font-size: 9px !important; background: rgba(255,255,255,0.8) !important; }
   .chip { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; cursor: pointer;
-          background: #fff; color: ${colors.ink}; border: 1px solid ${colors.border}; border-radius: 999px; padding: 6px 10px;
+          background: ${colors.surface}; color: ${colors.ink}; border: 1px solid ${colors.border}; border-radius: 999px; padding: 6px 10px;
           font: 700 13px/1 -apple-system, Roboto, sans-serif; box-shadow: 0 3px 10px rgba(59,47,30,0.22); transition: transform .15s; }
   .chip.active { background: ${colors.forest}; color: #fff; border-color: ${colors.forest}; }
   .chip .swap { color: ${colors.forest}; font-size: 12px; }
   .chip.active .swap { color: #fff; }
+  .chip .emo { font-size: 14px; line-height: 1; }
+  .chip.pending { opacity: .6; filter: grayscale(1); }
   .me { width: 14px; height: 14px; border-radius: 50%; background: #2F6FB0; border: 3px solid #fff; box-shadow: 0 0 0 7px rgba(47,111,176,0.2); }
   .drop { width: 34px; height: 34px; }
   .drop div { width: 34px; height: 34px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: ${colors.tomato};
@@ -99,7 +110,10 @@ export function buildMapHtml(center: GeoPoint, zoom: number): string {
   var engine = null, readySent = false;
 
   function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
-  function chipHtml(m, active) { return '<div class="chip' + (active ? ' active' : '') + '">' + (m.swap ? '<span class="swap">⇄</span>' : '') + esc(m.label) + '</div>'; }
+  function chipHtml(m, active) {
+    return '<div class="chip' + (active ? ' active' : '') + (m.pending ? ' pending' : '') + '">' + (m.emoji ? '<span class="emo">' + esc(m.emoji) + '</span>' : '') +
+      (m.swap ? '<span class="swap">⇄</span>' : '') + esc(m.label) + '</div>';
+  }
   function ready() { if (!readySent) { readySent = true; hmSend({ type: 'ready' }); } }
   function circlePolygon(c) {
     var pts = [], R = 6371000, lat = c.center.latitude * Math.PI / 180, lng = c.center.longitude * Math.PI / 180, d = c.radiusM / R;
@@ -119,7 +133,7 @@ export function buildMapHtml(center: GeoPoint, zoom: number): string {
     function fail(reason) { if (failed || loaded) return; failed = true; try { map && map.remove(); } catch (e) {} onFail(reason); }
     try {
       map = new maplibregl.Map({
-        container: 'map', style: '${VECTOR_STYLE}', center: [init.lng, init.lat], zoom: init.zoom,
+        container: 'map', style: '${dark ? VECTOR_STYLE_DARK : VECTOR_STYLE}', center: [init.lng, init.lat], zoom: init.zoom,
         attributionControl: { compact: false }, pitchWithRotate: false, dragRotate: false, maxZoom: 19, fadeDuration: 150,
       });
     } catch (e) { fail('webgl'); return null; }
