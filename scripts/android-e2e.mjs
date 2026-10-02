@@ -227,7 +227,7 @@ try {
     await sleep(1000);
   }
   await tap(/^English$/);
-  const en = await find(/App language|Search/, { timeout: 15_000 });
+  const en = await find(/^Settings$|Public profile|App language/, { timeout: 15_000 });
   step(Boolean(en), 'Passage en anglais');
   shot('parametres-anglais');
   await tap(/^Français$/);
