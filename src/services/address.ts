@@ -58,6 +58,39 @@ async function photon(query: string): Promise<GeoResult | null> {
   };
 }
 
+export interface AddressSuggestion extends GeoResult {
+  /** Rue et numéro seuls (pour remplir le champ « Adresse »). */
+  street: string | null;
+  city: string | null;
+}
+
+/**
+ * Suggestions d'adresses pendant la frappe (comme Google Maps), gratuites et sans clé : Photon (OpenStreetMap),
+ * conçu pour l'autocomplétion. Canada seulement, biais vers `near` (position de l'utilisateur) ou Montréal.
+ */
+export async function suggestAddresses(query: string, near?: GeoPoint | null): Promise<AddressSuggestion[]> {
+  const q = query.trim();
+  if (q.length < 3) return [];
+  const lat = near?.latitude ?? 45.52;
+  const lon = near?.longitude ?? -73.58;
+  const url = `https://photon.komoot.io/api/?limit=8&lat=${lat}&lon=${lon}&lang=${getLang() === 'en' ? 'en' : 'fr'}&q=${encodeURIComponent(q)}`;
+  const res = await fetch(url, { headers: HEADERS });
+  if (!res.ok) throw new Error(`Photon ${res.status}`);
+  const features = ((await res.json()) as { features?: { geometry: { coordinates: [number, number] }; properties: Record<string, string> }[] }).features ?? [];
+  const seen = new Set<string>();
+  return features
+    .filter((f) => (f.properties.countrycode ?? '').toUpperCase() === 'CA')
+    .map((f) => {
+      const p = f.properties;
+      const street = p.street ? [p.housenumber, p.street].filter(Boolean).join(' ') : null;
+      const head = street ?? p.name ?? '';
+      const label = [head && p.name && street && p.name !== street ? `${p.name}, ${head}` : head, p.city ?? p.district, p.postcode].filter(Boolean).join(', ');
+      return { latitude: f.geometry.coordinates[1], longitude: f.geometry.coordinates[0], label, postalCode: p.postcode ?? null, street, city: p.city ?? null };
+    })
+    .filter((s) => s.label && !seen.has(s.label) && seen.add(s.label))
+    .slice(0, 6);
+}
+
 /** Adresse, code postal (complet ou « H2J ») ou lieu → coordonnées. */
 export async function geocode(query: string): Promise<GeoResult | null> {
   const q = query.trim();

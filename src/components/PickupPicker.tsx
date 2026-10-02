@@ -8,6 +8,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 import { colors, createStyles, radius, spacing, type } from '@/theme';
 import type { GeoPoint } from '@/types';
+import { AddressAutocomplete } from './AddressAutocomplete';
 import { LeafletMap, LeafletMapHandle } from './LeafletMap';
 import { Button, TextField } from './ui';
 
@@ -32,6 +33,7 @@ export function PickupPicker({
   onConfirmed,
   hideArea,
   autoLocate = true,
+  searchable = true,
 }: {
   value: GeoPoint;
   onChange: (p: GeoPoint) => void;
@@ -43,10 +45,13 @@ export function PickupPicker({
   hideArea?: boolean;
   /** Se placer d'emblée sur la position GPS (faux si une adresse enregistrée est déjà affichée). */
   autoLocate?: boolean;
+  /** Champ « Rechercher une adresse » avec suggestions (faux quand l'écran a déjà son propre champ d'adresse). */
+  searchable?: boolean;
 }) {
   const mapRef = useRef<LeafletMapHandle>(null);
   const [mapFailed, setMapFailed] = useState(false);
   const [locating, setLocating] = useState(false);
+  const [query, setQuery] = useState('');
   const areaRef = useRef(area ?? '');
   areaRef.current = area ?? '';
 
@@ -82,6 +87,22 @@ export function PickupPicker({
 
   return (
     <View style={{ gap: spacing.md }}>
+      {searchable && (
+        <AddressAutocomplete
+          label={t('Rechercher une adresse ou un lieu')}
+          placeholder={t('Ex. 1234 rue Rachel Est, métro Laurier…')}
+          value={query}
+          onChangeText={setQuery}
+          onPick={(s) => {
+            setQuery(s.label);
+            const p = { latitude: s.latitude, longitude: s.longitude };
+            onChange(p);
+            onConfirmed();
+            mapRef.current?.flyTo(p, 17);
+            fillArea(p);
+          }}
+        />
+      )}
       {!mapFailed && (
         <View style={styles.mapBox}>
           <LeafletMap
@@ -123,7 +144,7 @@ export function PickupPicker({
         />
       )}
       <Text style={type.caption}>
-        {t('Vos voisins voient seulement votre zone postale (ex. H2J) et un point approximatif (100 à 300 m). L’adresse exacte est partagée après acceptation de la commande (et paiement pour un achat).')}
+        {t('Vos voisins voient seulement votre zone postale (ex. H2J) et un point approximatif (100 à 300 m). Après acceptation, c’est vous qui décidez de partager l’adresse exacte ou de proposer un point de rencontre.')}
       </Text>
     </View>
   );

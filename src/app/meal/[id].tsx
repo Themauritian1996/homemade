@@ -12,12 +12,14 @@ import { formatDistance, formatPrice, relativeTime, timeLeft } from '@/lib/forma
 import { evaluateMeal } from '@/lib/safety';
 import { fetchCookerReviews, fetchMeal } from '@/services/meals';
 import { useApp } from '@/store/app';
-import { colors, createStyles, radius, shadow, spacing, type } from '@/theme';
+import { colors, createStyles, fonts, radius, shadow, spacing, type } from '@/theme';
 import type { Meal, Review } from '@/types';
 
 import { t, tr } from '@/i18n';
 import { photoFreshness } from '@/lib/photoFreshness';
-import { SALES_ENABLED } from '@/services/payments';
+import { SALES_ENABLED } from '@/services/payments';
+import { formatPortion } from '@/data/portions';
+import { PhotoViewer } from '@/components/PhotoViewer';
 export default function MealDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
@@ -28,6 +30,7 @@ export default function MealDetail() {
   const [meal, setMeal] = useState<Meal | null>(null);
   const [missing, setMissing] = useState(false);
   const [reviews, setReviews] = useState<Review[]>([]);
+  const [viewer, setViewer] = useState<number | null>(null);
 
   useEffect(() => {
     fetchMeal(id)
@@ -74,8 +77,16 @@ export default function MealDetail() {
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <ScrollView contentContainerStyle={{ paddingBottom: 140 }}>
         <View>
-          <Image source={{ uri: meal.photos[0] }} style={styles.hero} contentFit="cover" transition={300} />
-          <LinearGradient colors={['rgba(0,0,0,0.45)', 'transparent']} style={[StyleSheet.absoluteFill, { height: 140 }]} />
+          <Pressable onPress={() => meal.photos.length && setViewer(0)} accessibilityRole="imagebutton" accessibilityLabel={t('Agrandir la photo')}>
+            <Image source={{ uri: meal.photos[0] }} style={styles.hero} contentFit="cover" transition={300} />
+          </Pressable>
+          <LinearGradient colors={['rgba(0,0,0,0.45)', 'transparent']} style={[StyleSheet.absoluteFill, { height: 140 }]} pointerEvents="none" />
+          {meal.photos.length > 0 && (
+            <Pressable style={styles.zoomBadge} onPress={() => setViewer(0)} accessibilityRole="button" accessibilityLabel={t('Agrandir la photo')}>
+              <Ionicons name="expand-outline" size={14} color="#fff" />
+              <Text style={styles.zoomText}>{meal.photos.length > 1 ? t('{n} photos', { n: meal.photos.length }) : t('Agrandir')}</Text>
+            </Pressable>
+          )}
           <View style={[styles.heroBar, { top: insets.top + spacing.sm }]}>
             <Pressable style={styles.heroBtn} onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} accessibilityLabel={t('Retour')}>
               <Ionicons name="chevron-back" size={20} color={colors.ink} />
@@ -225,12 +236,14 @@ export default function MealDetail() {
           <Text style={[type.price, { fontSize: 20 }]} numberOfLines={1} adjustsFontSizeToFit>
             {formatPrice(meal.priceCents)}
           </Text>
-          <Text style={type.caption} numberOfLines={1}>
-            {meal.priceCents != null ? t('par portion') : t('contre un de vos plats')}
+          <Text style={type.caption} numberOfLines={2}>
+            {meal.priceCents != null ? t('par {portion}', { portion: formatPortion(meal.portionQty, meal.portionUnit) }) : t('contre un de vos plats · 1 portion = {portion}', { portion: formatPortion(meal.portionQty, meal.portionUnit) })}
           </Text>
         </View>
         {mine ? (
           <Button title={t('Gérer mes plats')} size="md" icon="storefront-outline" onPress={() => router.push('/my-meals')} />
+        ) : meal.isPrivate ? (
+          <Text style={[type.caption, { maxWidth: 180, textAlign: 'right' }]}>{t('Offre d’échange privée : répondez dans la conversation.')}</Text>
         ) : (
           <View style={{ flexDirection: 'row', gap: spacing.sm }}>
             {meal.mode !== 'sale' && (
@@ -255,6 +268,7 @@ export default function MealDetail() {
           </View>
         )}
       </View>
+      <PhotoViewer photos={meal.photos} index={viewer} onClose={() => setViewer(null)} />
     </View>
   );
 }
@@ -270,6 +284,8 @@ function Meta({ icon, label }: { icon: React.ComponentProps<typeof Ionicons>['na
 
 const styles = createStyles(() => ({
   hero: { width: '100%', height: 340, backgroundColor: colors.surfaceAlt },
+  zoomBadge: { position: 'absolute', right: spacing.lg, bottom: spacing.xxl + spacing.md, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: radius.pill },
+  zoomText: { color: '#fff', fontFamily: fonts.semibold, fontSize: 12 },
   heroBar: { position: 'absolute', left: spacing.lg, right: spacing.lg, flexDirection: 'row', justifyContent: 'space-between' },
   heroBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', ...shadow.card },
   sheet: { marginTop: -28, backgroundColor: colors.bg, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: spacing.xl, gap: spacing.lg },

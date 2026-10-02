@@ -9,10 +9,26 @@ import { useEffect } from 'react';
 import { AppState } from 'react-native';
 import { notifyMessage, startNotifications } from '@/lib/notifications';
 import { refreshUnread, subscribeToMyMessages } from '@/services/chat';
+import { DEMO_MODE } from '@/lib/config';
+import { requireSupabase } from '@/lib/supabase';
 import { useApp } from '@/store/app';
 
 export function useSessionSync() {
   const userId = useApp((s) => s.user?.id);
+  const lang = useApp((s) => s.lang);
+
+  // Langue du compte (serveur) : les notifications envoyées app fermée sont rédigées dans cette langue.
+  useEffect(() => {
+    if (!userId || DEMO_MODE) return;
+    requireSupabase()
+      .from('profiles')
+      .update({ locale: lang === 'en' ? 'en-CA' : 'fr-CA' })
+      .eq('id', userId)
+      .then(
+        () => undefined,
+        () => undefined,
+      );
+  }, [userId, lang]);
 
   useEffect(() => {
     let alive = true;

@@ -72,7 +72,7 @@ const DOCS: Record<string, { title: string; sections: [string, string][] }> = {
       ],
       [
         'Hébergement',
-        "Les données sont hébergées par Supabase. Pendant la bêta, l'hébergement peut se situer hors du Québec ; un transfert vers un hébergement au Canada est prévu avant le lancement public.",
+        "Les données sont hébergées par Supabase au Canada (Montréal). Prestataires hors Québec : Stripe pour les paiements ; Firebase (Google) pour livrer les notifications (prénom de l'expéditeur, et le texte du message seulement si vous l'activez) ; Photon (OpenStreetMap, Europe) reçoit l'adresse que vous tapez pour proposer des suggestions.",
       ],
       [
         'Conservation',

@@ -7,7 +7,7 @@ import { useStripe } from '@stripe/stripe-react-native';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MealCard } from '@/components/MealCard';
 import { SwapPhotoOffer } from '@/components/SwapPhotoOffer';
@@ -22,9 +22,11 @@ import { colors, createStyles, fonts, radius, spacing, type } from '@/theme';
 import type { Meal } from '@/types';
 
 import { t } from '@/i18n';
+import { KEYBOARD_BEHAVIOR, useKeyboardAutoScroll } from '@/lib/useKeyboardAutoScroll';
 export default function OrderModal() {
   const { id, kind } = useLocalSearchParams<{ id: string; kind: 'purchase' | 'swap' }>();
   const insets = useSafeAreaInsets();
+  const kb = useKeyboardAutoScroll();
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const [meal, setMeal] = useState<Meal | null>(null);
   const [qty, setQty] = useState(1);
@@ -101,12 +103,12 @@ export default function OrderModal() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior={KEYBOARD_BEHAVIOR}>
       <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
         <Text style={type.h2}>{kind === 'swap' ? t('Proposer un échange') : t('Votre commande')}</Text>
         <IconButton icon="close" onPress={() => router.back()} accessibilityLabel={t('Fermer')} />
       </View>
-      <ScrollView contentContainerStyle={{ padding: spacing.xl, gap: spacing.xl, paddingBottom: 160 }}>
+      <ScrollView {...kb} style={{ flex: 1 }} contentContainerStyle={{ padding: spacing.xl, gap: spacing.xl, paddingBottom: spacing.xl }}>
         <View style={styles.summary}>
           <Image source={{ uri: meal.photos[0] }} style={styles.thumb} contentFit="cover" />
           <View style={{ flex: 1, gap: 2 }}>
@@ -189,7 +191,7 @@ export default function OrderModal() {
           <Button title={t('Envoyer la proposition')} icon="swap-horizontal" onPress={swap} loading={loading} disabled={offerKind === 'meal' ? !offered : !photoOffer} />
         )}
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -212,5 +214,5 @@ const styles = createStyles(() => ({
   info: { flexDirection: 'row', gap: spacing.sm, backgroundColor: colors.sage, padding: spacing.md, borderRadius: radius.md },
   offer: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.xs, paddingRight: spacing.md, borderRadius: radius.lg, borderWidth: 1.5, borderColor: 'transparent' },
   note: { minHeight: 80, backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, fontFamily: fonts.regular, fontSize: 15, color: colors.ink, borderWidth: 1, borderColor: colors.border, textAlignVertical: 'top' },
-  footer: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: spacing.xl, paddingTop: spacing.md, backgroundColor: colors.bg, borderTopWidth: 1, borderTopColor: colors.border },
+  footer: { padding: spacing.xl, paddingTop: spacing.md, backgroundColor: colors.bg, borderTopWidth: 1, borderTopColor: colors.border },
 }));

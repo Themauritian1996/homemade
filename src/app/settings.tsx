@@ -16,10 +16,13 @@ import { useApp } from '@/store/app';
 import { colors, createStyles, radius, spacing, type } from '@/theme';
 
 import { t } from '@/i18n';
+import { KEYBOARD_BEHAVIOR, useKeyboardAutoScroll } from '@/lib/useKeyboardAutoScroll';
+import { NotificationSettings } from '@/components/NotificationSettings';
 const RADII = [2, 5, 10, 15, 25];
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
+  const kb = useKeyboardAutoScroll();
   // Retour du formulaire Stripe : homemade://settings?payments=done → statut rafraîchi.
   const params = useLocalSearchParams<{ payments?: string }>();
   const user = useApp((s) => s.user);
@@ -40,6 +43,7 @@ export default function SettingsScreen() {
         setProfile({ ...p, displayName: p.displayName || user.displayName });
         setSettings(s);
         useApp.getState().setNotifyMessages(s.notifyMessages);
+        useApp.getState().setNotifyPreview(s.notifyPreview);
       })
       .catch((e) => Alert.alert(t('Chargement impossible'), friendlyError(e)));
   }, [user]);
@@ -58,6 +62,7 @@ export default function SettingsScreen() {
     setSettings(next);
     if (patch.defaultRadiusKm) setFilters({ radiusKm: patch.defaultRadiusKm });
     if (patch.notifyMessages !== undefined) useApp.getState().setNotifyMessages(patch.notifyMessages);
+    if (patch.notifyPreview !== undefined) useApp.getState().setNotifyPreview(patch.notifyPreview);
     saveSettings(user.id, next).catch((e) => Alert.alert(t('Préférence non enregistrée'), friendlyError(e)));
   };
 
@@ -126,9 +131,10 @@ export default function SettingsScreen() {
     );
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior={KEYBOARD_BEHAVIOR}>
       <ScreenHeader title={t('Paramètres')} />
       <ScrollView
+        {...kb}
         contentContainerStyle={{ padding: spacing.xl, paddingTop: spacing.sm, gap: spacing.xl, paddingBottom: insets.bottom + spacing.huge }}
         keyboardShouldPersistTaps="handled"
       >
@@ -201,14 +207,7 @@ export default function SettingsScreen() {
         </Section>
 
         <Section title={t('Notifications')}>
-          <Card>
-            <SwitchRow label={t('Nouveaux messages et commandes')} value={settings.notifyMessages} onChange={(v) => updateSettings({ notifyMessages: v })} />
-            <Divider />
-            <SwitchRow label={t('Nouveaux plats près de chez moi')} value={settings.notifyNewNearby} onChange={(v) => updateSettings({ notifyNewNearby: v })} />
-          </Card>
-          <Text style={type.caption}>
-            {t('Vous êtes prévenu·e des nouveaux messages et de chaque étape de vos échanges (demande, acceptation, remise).')}
-          </Text>
+          <NotificationSettings settings={settings} onChange={updateSettings} />
         </Section>
 
         <Section title={t('Confidentialité et données (Loi 25)')}>

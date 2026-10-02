@@ -36,14 +36,16 @@ import { ingredientsFromScan, mergeScan } from '@/lib/scanMerge';
 import { useAiAvailable } from '@/lib/useAiAvailable';
 import { aiAvailable, analyzeMealPhoto, preparePhoto, PreparedPhoto, scanText, uploadMealPhoto } from '@/services/ai';
 import { getMyAddress } from '@/services/address';
-import { publishMeal, setMealPhotoMeta } from '@/services/meals';
+import { publishMeal } from '@/services/meals';
+import { DEFAULT_PORTION, formatPortion, PORTION_UNITS, PortionUnit, unitDef, unitName } from '@/data/portions';
 import { PickedPhoto, pickPhoto } from '@/lib/pickPhoto';
 import { fetchPaymentStatus, SALES_ENABLED } from '@/services/payments';
 import { useApp } from '@/store/app';
 import { colors, createStyles, fonts, radius, shadow, spacing, type } from '@/theme';
 import type { AiMealAnalysis, AiTextScan, GeoPoint, MealIngredient, MealMode } from '@/types';
 
-import { t, tr } from '@/i18n';
+import { locale, t, tr } from '@/i18n';
+import { KEYBOARD_BEHAVIOR, useKeyboardAutoScroll } from '@/lib/useKeyboardAutoScroll';
 /** Sans clé Stripe, la vente est impossible côté serveur : la bêta se fait en mode échange. */
 
 type Step = 'capture' | 'analyzing' | 'review' | 'done';
@@ -231,6 +233,7 @@ function ReviewStep({
   onPublished: () => void;
 }) {
   const insets = useSafeAreaInsets();
+  const kb = useKeyboardAutoScroll();
   const location = useApp((s) => s.location);
   const hasRealLocation = useApp((s) => s.hasRealLocation);
   const userId = useApp((s) => s.user?.id ?? 'anon');
@@ -255,6 +258,8 @@ function ReviewStep({
   const [canSell, setCanSell] = useState(false);
   const [price, setPrice] = useState(String(SUGGESTED_PRICE));
   const [portions, setPortions] = useState(3);
+  const [portionUnit, setPortionUnit] = useState<PortionUnit>(DEFAULT_PORTION.unit);
+  const [portionQty, setPortionQty] = useState(String(DEFAULT_PORTION.qty));
   const [hours, setHours] = useState(24);
   const [pickupArea, setPickupArea] = useState('');
   const [pickup, setPickup] = useState<GeoPoint>(location);
@@ -350,10 +355,12 @@ function ReviewStep({
       );
     }
     const errors = validateMealDraft({ title, ingredients, allergens, diets, mode, priceCents, portions, attestation: attested });
+    const q = Number(portionQty.replace(',', '.'));
+    if (!(Math.round(q * 100) >= 1 && q <= 10000)) errors.push(t('Indiquez ce que contient une portion (ex. 1 assiette, 500 ml, 10 pièces).'));
     if (errors.length) return Alert.alert(t('À compléter'), errors.join('\n\n'));
     setPublishing(true);
     try {
-      const published = await publishMeal({
+      await publishMeal({
         aiAnalysisId: analysisId ?? undefined,
         photoPaths: photoPath ? [photoPath] : [],
         title: title.trim(),
@@ -366,13 +373,15 @@ function ReviewStep({
         mode,
         priceCents,
         portions,
+        portionQty: Number(portionQty.replace(',', '.')) || 1,
+        portionUnit,
+        photoSource: photoMeta && photoPath ? photoMeta.source : undefined,
+        photoTakenAt: photoMeta && photoPath ? photoMeta.takenAt : undefined,
         availableHours: hours,
         pickup,
         pickupArea: pickupArea.trim() || t('Quartier communiqué après confirmation'),
         cookerAttestation: attested,
       });
-      // Fraîcheur de la photo (indice affiché aux voisins) : jamais bloquant.
-      if (photoMeta && photoPath) await setMealPhotoMeta(published.id, photoMeta.takenAt, photoMeta.source).catch(() => {});
       onPublished();
     } catch (e) {
       Alert.alert(t('Publication impossible'), friendlyError(e));
@@ -382,8 +391,8 @@ function ReviewStep({
   };
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView contentContainerStyle={{ paddingBottom: 140 }} keyboardShouldPersistTaps="handled">
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior={KEYBOARD_BEHAVIOR}>
+      <ScrollView {...kb} contentContainerStyle={{ paddingBottom: 140 }}>
         <View>
           {photo ? <Image source={{ uri: photo.uri }} style={styles.reviewPhoto} contentFit="cover" /> : <View style={[styles.reviewPhoto, { backgroundColor: colors.surfaceAlt }]} />}
           <LinearGradient colors={['rgba(0,0,0,0.4)', 'transparent']} style={[StyleSheet.absoluteFill, { height: 120 }]} />
@@ -577,9 +586,26 @@ function ReviewStep({
             )}
           </Section>
 
+          <Section title={t('Une portion, c’est…')}>
+            <PortionPicker
+              unit={portionUnit}
+              qty={portionQty}
+              onUnit={(u) => {
+                setPortionUnit(u);
+                setPortionQty(String(unitDef(u).quick[0]));
+              }}
+              onQty={setPortionQty}
+            />
+            <Text style={type.caption}>
+              {mode === 'swap'
+                ? t('Vos voisins verront : 1 portion = {portion}.', { portion: formatPortion(Number(portionQty.replace(',', '.')), portionUnit) })
+                : t('Prix affiché : {price} / {portion}', { price: formatPrice(priceCents), portion: formatPortion(Number(portionQty.replace(',', '.')), portionUnit) })}
+            </Text>
+          </Section>
+
           <Section title={t('Disponibilité')}>
             <Stepper label={t('Portions')} value={portions} onChange={setPortions} min={1} max={20} />
-            <Stepper label={t('Disponible pendant')} value={hours} onChange={setHours} min={2} max={72} step={2} suffix=" h" />
+            <DurationPicker value={hours} onChange={setHours} />
           </Section>
 
           <Section title={t('Lieu de cueillette')}>
@@ -788,6 +814,87 @@ function Stepper({ label, value, onChange, min, max, step = 1, suffix = '' }: { 
   );
 }
 
+/** Ce que contient une portion : unité (assiette, ml, pièces…) + quantité, avec des choix rapides par unité. */
+function PortionPicker({ unit, qty, onUnit, onQty }: { unit: PortionUnit; qty: string; onUnit: (u: PortionUnit) => void; onQty: (q: string) => void }) {
+  const def = unitDef(unit);
+  return (
+    <View style={{ gap: spacing.sm }}>
+      <View style={styles.wrap}>
+        {PORTION_UNITS.map((u) => (
+          <Chip key={u.id} label={unitName(u.id, u.measure ? 1 : 2)} selected={unit === u.id} onPress={() => onUnit(u.id)} />
+        ))}
+      </View>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' }}>
+        <TextInput
+          value={qty}
+          onChangeText={(v) => onQty(v.replace(/[^0-9.,]/g, '').slice(0, 7))}
+          keyboardType="decimal-pad"
+          style={styles.hoursInput}
+          accessibilityLabel={t('Quantité par portion')}
+        />
+        <Text style={type.body}>{unitName(unit, Number(qty.replace(',', '.')) || 1)}</Text>
+        {def.quick.length > 1 &&
+          def.quick.map((n) => <Chip key={n} label={formatPortion(n, unit)} selected={Number(qty.replace(',', '.')) === n} onPress={() => onQty(String(n))} />)}
+      </View>
+    </View>
+  );
+}
+
+/** Durée de disponibilité : choix rapides, saisie libre en heures (2 à 72 h, règle du serveur) et heure de fin. */
+const QUICK_HOURS = [2, 4, 6, 12, 24, 48, 72];
+function DurationPicker({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  const [custom, setCustom] = useState(QUICK_HOURS.includes(value) ? '' : String(value));
+  const until = new Date(Date.now() + value * 3_600_000);
+  const apply = (text: string) => {
+    const clean = text.replace(/[^0-9]/g, '').slice(0, 2);
+    setCustom(clean);
+    const n = Number(clean);
+    if (n) onChange(Math.min(72, Math.max(2, n)));
+  };
+  return (
+    <View style={{ gap: spacing.sm }}>
+      <Text style={type.bodyStrong}>{t('Disponible pendant')}</Text>
+      <View style={styles.wrap}>
+        {QUICK_HOURS.map((h) => (
+          <Chip
+            key={h}
+            label={h < 24 || h % 24 ? t('{n} h', { n: h }) : t('{n} j', { n: h / 24 })}
+            selected={value === h && !custom}
+            onPress={() => {
+              setCustom('');
+              onChange(h);
+            }}
+          />
+        ))}
+      </View>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+        <Pressable style={styles.stepBtn} onPress={() => apply(String(Math.max(2, value - 1)))} accessibilityLabel={t('Diminuer')}>
+          <Ionicons name="remove" size={18} color={colors.ink} />
+        </Pressable>
+        <TextInput
+          value={custom || String(value)}
+          onChangeText={apply}
+          // En quittant le champ : il affiche la durée réellement retenue (bornée à 2–72 h).
+          onEndEditing={() => setCustom(QUICK_HOURS.includes(value) ? '' : String(value))}
+          keyboardType="number-pad"
+          maxLength={2}
+          style={styles.hoursInput}
+          accessibilityLabel={t('Nombre d’heures (2 à 72)')}
+        />
+        <Text style={type.body}>{t('heures')}</Text>
+        <Pressable style={styles.stepBtn} onPress={() => apply(String(Math.min(72, value + 1)))} accessibilityLabel={t('Augmenter')}>
+          <Ionicons name="add" size={18} color={colors.ink} />
+        </Pressable>
+      </View>
+      <Text style={type.caption}>
+        {t('Visible jusqu’à {when} · entre 2 et 72 h', {
+          when: until.toLocaleString(locale(), { weekday: 'short', hour: '2-digit', minute: '2-digit' }),
+        })}
+      </Text>
+    </View>
+  );
+}
+
 // ───────────────────────────────────────── Done
 function DoneStep({ onAgain }: { onAgain: () => void }) {
   return (
@@ -835,6 +942,7 @@ const styles = createStyles(() => ({
     backgroundColor: colors.surface,
   },
   addBtn: { width: 48, height: 48, borderRadius: radius.md, backgroundColor: colors.forest, alignItems: 'center', justifyContent: 'center' },
+  hoursInput: { minWidth: 64, height: 44, textAlign: 'center', fontFamily: fonts.semibold, fontSize: 18, color: colors.ink, backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border },
   stepper: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.surface, padding: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border },
   stepBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' },
   attest: {

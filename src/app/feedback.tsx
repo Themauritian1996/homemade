@@ -10,6 +10,7 @@ import { useApp } from '@/store/app';
 import { colors, createStyles, fonts, radius, spacing, type } from '@/theme';
 
 import { t } from '@/i18n';
+import { KEYBOARD_BEHAVIOR, useKeyboardAutoScroll } from '@/lib/useKeyboardAutoScroll';
 const KINDS: { id: FeedbackKind; label: string; emoji: string; placeholder: string }[] = [
   { id: 'bug', label: 'Un bogue', emoji: '🐞', placeholder: 'Qu’avez-vous fait, et que s’est-il passé ? (écran, bouton, message d’erreur…)' },
   { id: 'idea', label: 'Une idée', emoji: '💡', placeholder: 'Qu’est-ce qui rendrait Homemade plus utile pour vous ?' },
@@ -19,6 +20,7 @@ const KINDS: { id: FeedbackKind; label: string; emoji: string; placeholder: stri
 
 export default function Feedback() {
   const insets = useSafeAreaInsets();
+  const kb = useKeyboardAutoScroll();
   const user = useApp((s) => s.user);
   const [kind, setKind] = useState<FeedbackKind>('bug');
   const [message, setMessage] = useState('');
@@ -40,9 +42,10 @@ export default function Feedback() {
   };
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior={KEYBOARD_BEHAVIOR}>
       <ScreenHeader title={t('Votre avis sur la bêta')} modal />
       <ScrollView
+        {...kb}
         contentContainerStyle={{ padding: spacing.xl, paddingTop: spacing.sm, gap: spacing.lg, paddingBottom: insets.bottom + spacing.huge }}
         keyboardShouldPersistTaps="handled"
       >

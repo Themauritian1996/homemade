@@ -11,6 +11,7 @@ import { useApp } from '@/store/app';
 import { colors, createStyles, fonts, radius, spacing, type } from '@/theme';
 
 import { t } from '@/i18n';
+import { KEYBOARD_BEHAVIOR, useKeyboardAutoScroll } from '@/lib/useKeyboardAutoScroll';
 const REASONS: { id: ReportReason; label: string; hint: string }[] = [
   { id: 'allergen_incident', label: 'Réaction allergique / allergène non déclaré', hint: 'Le plat est retiré immédiatement.' },
   { id: 'hygiene', label: 'Problème d’hygiène ou plat avarié', hint: 'Le plat est retiré immédiatement.' },
@@ -25,6 +26,7 @@ const REASONS: { id: ReportReason; label: string; hint: string }[] = [
 export default function Report() {
   const { mealId, subjectId, orderId, title } = useLocalSearchParams<{ mealId?: string; subjectId?: string; orderId?: string; title?: string }>();
   const insets = useSafeAreaInsets();
+  const kb = useKeyboardAutoScroll();
   const user = useApp((s) => s.user);
   const [reason, setReason] = useState<ReportReason | null>(null);
   const [details, setDetails] = useState('');
@@ -50,9 +52,10 @@ export default function Report() {
   };
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior={KEYBOARD_BEHAVIOR}>
       <ScreenHeader title={t('Signaler')} subtitle={title} modal />
       <ScrollView
+        {...kb}
         contentContainerStyle={{ padding: spacing.xl, paddingTop: spacing.sm, gap: spacing.md, paddingBottom: insets.bottom + spacing.huge }}
         keyboardShouldPersistTaps="handled"
       >

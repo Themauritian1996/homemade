@@ -102,15 +102,40 @@ export async function stopPushNotifications() {
 /** Nouveau message reçu (temps réel) : notification locale si Firebase n'est pas actif, sauf mes messages et la conversation ouverte. */
 export async function notifyMessage(m: Message, from?: string) {
   if (pushToken) return; // Firebase s'en charge (y compris app ouverte)
-  const { user, notifyMessages } = useApp.getState();
+  const { user, notifyMessages, notifyPreview } = useApp.getState();
   if (!notifyMessages || !user || m.senderId === user.id || m.conversationId === activeConversation) return;
   if (!(await setup())) return;
   await Notifications.scheduleNotificationAsync({
     content: {
       title: m.kind === 'system' ? t('Homemade · votre échange') : from ?? t('Nouveau message'),
-      body: m.body,
+      body: m.kind === 'system' || notifyPreview ? m.body : t('Nouveau message'),
       data: { conversationId: m.conversationId },
     },
     trigger: Platform.OS === 'android' ? { channelId: 'messages' } : null,
   });
+}
+
+/** État de l'autorisation du téléphone (écran Paramètres). */
+export async function notificationPermission(): Promise<'granted' | 'denied' | 'undetermined' | 'unsupported'> {
+  if (Platform.OS === 'web') return 'unsupported';
+  const p = await Notifications.getPermissionsAsync();
+  if (p.granted) return 'granted';
+  return p.canAskAgain ? 'undetermined' : 'denied';
+}
+
+/** Demande l'autorisation (ou rien si déjà refusée : il faut alors passer par les réglages du téléphone). */
+export async function askNotificationPermission(): Promise<boolean> {
+  const ok = await setup();
+  if (ok) await registerPushToken();
+  return ok;
+}
+
+/** Notification d'essai, pour vérifier son et affichage. */
+export async function sendTestNotification(): Promise<boolean> {
+  if (!(await setup())) return false;
+  await Notifications.scheduleNotificationAsync({
+    content: { title: 'Homemade', body: t('Les notifications fonctionnent 🎉') },
+    trigger: { type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: 2, channelId: 'messages' },
+  });
+  return true;
 }

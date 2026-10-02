@@ -5,6 +5,8 @@
  */
 import { DEMO_MODE } from '@/lib/config';
 import { requireSupabase } from '@/lib/supabase';
+import { photoUrl } from '@/services/meals';
+import type { PublicProfile } from '@/types';
 
 export interface PaymentSheetParams {
   orderId: string;
@@ -76,6 +78,27 @@ export async function proposeSwapWithPhoto(mealId: string, offer: SwapPhotoOffer
   if (error) throw error;
   const row = data as { order_id: string; conversation_id: string };
   return { orderId: row.order_id, conversationId: row.conversation_id };
+}
+
+/** Échange ou commande en cours, pour l'accueil (ce qui attend ma réponse en premier). */
+export interface ActiveExchange {
+  orderId: string;
+  kind: 'purchase' | 'swap';
+  status: string;
+  role: 'cooker' | 'eater';
+  needsMe: boolean;
+  conversationId: string | null;
+  mealId: string;
+  mealTitle: string;
+  mealPhoto: string | null;
+  other: PublicProfile;
+}
+
+export async function fetchActiveExchanges(): Promise<ActiveExchange[]> {
+  if (DEMO_MODE) return [];
+  const { data, error } = await requireSupabase().rpc('my_active_exchanges');
+  if (error) throw error;
+  return ((data as ActiveExchange[]) ?? []).map((e) => ({ ...e, mealPhoto: e.mealPhoto ? photoUrl(e.mealPhoto) : null }));
 }
 
 export type OrderAction = 'accepted' | 'declined' | 'ready' | 'picked_up' | 'cancelled';

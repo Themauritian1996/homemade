@@ -83,10 +83,11 @@ Deno.serve(
       .neq('user_id', msg.sender_id ?? '00000000-0000-0000-0000-000000000000');
     const candidates = (parts ?? []).filter((p) => !p.hidden_at).map((p) => p.user_id as string);
     if (!candidates.length) return json({ sent: 0 });
-    const { data: muted } = await db.from('user_settings').select('user_id').in('user_id', candidates).eq('notify_messages', false);
-    const recipients = candidates.filter((id) => !(muted ?? []).some((m) => m.user_id === id));
+    const { data: settings } = await db.from('user_settings').select('user_id, notify_messages, notify_preview').in('user_id', candidates);
+    const pref = new Map((settings ?? []).map((x) => [x.user_id as string, x]));
+    const recipients = candidates.filter((id) => pref.get(id)?.notify_messages !== false);
     if (!recipients.length) return json({ sent: 0 });
-    const { data: tokens } = await db.from('push_tokens').select('token').in('user_id', recipients);
+    const { data: tokens } = await db.from('push_tokens').select('token, user_id').in('user_id', recipients);
     if (!tokens?.length) return json({ sent: 0 });
 
     let title = 'Homemade';
@@ -95,19 +96,24 @@ Deno.serve(
       if (p?.display_name) title = p.display_name;
     }
     const text = String(msg.body).length > 180 ? `${String(msg.body).slice(0, 177)}…` : String(msg.body);
+    // Texte d'un message privé : seulement si le destinataire l'a choisi (sinon « Nouveau message », dans sa langue).
+    const { data: locales } = await db.from('profiles').select('id, locale').in('id', recipients);
+    const lang = new Map((locales ?? []).map((x) => [x.id as string, String(x.locale ?? 'fr')]));
+    const bodyFor = (userId: string) =>
+      msg.kind === 'system' || pref.get(userId)?.notify_preview ? text : lang.get(userId)?.startsWith('en') ? 'New message' : 'Nouveau message';
 
     const auth = await accessToken(sa);
     let sent = 0;
     const stale: string[] = [];
     await Promise.all(
-      tokens.map(async ({ token }) => {
+      tokens.map(async ({ token, user_id }) => {
         const res = await fetch(`https://fcm.googleapis.com/v1/projects/${sa.project_id}/messages:send`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${auth}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({
             message: {
               token,
-              notification: { title, body: text },
+              notification: { title, body: bodyFor(user_id as string) },
               data: { conversationId: msg.conversation_id },
               android: { priority: 'HIGH', notification: { channel_id: 'messages', sound: 'default', color: '#E2553B' } },
             },

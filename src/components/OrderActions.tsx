@@ -3,17 +3,22 @@
  * Les règles font foi côté serveur (`transition_order`) ; cette barre ne fait que proposer les bons boutons.
  */
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, Linking, Platform, Pressable, Text, View } from 'react-native';
 import { friendlyError } from '@/lib/errors';
 import { fetchPickupDetails, PickupDetails } from '@/services/address';
+import { allergenById } from '@/data/allergens';
+import { fetchMeal } from '@/services/meals';
 import { fetchOrder, OrderAction, OrderSummary, shareAddress, transitionOrder } from '@/services/orders';
+import type { Meal } from '@/types';
+import { PhotoViewer } from './PhotoViewer';
 import { colors, createStyles, fonts, radius, spacing } from '@/theme';
 import { Button } from './ui';
 
-import { t } from '@/i18n';
-const STATUS_LABEL: Record<string, string> = {
+import { t, tr } from '@/i18n';
+export const STATUS_LABEL: Record<string, string> = {
   requested: 'En attente de réponse',
   paid: 'Paiement pré-autorisé · en attente du Cooker',
   accepted: 'Acceptée · cueillette à coordonner',
@@ -48,6 +53,8 @@ export function OrderActions({ orderId, me, refreshKey }: { orderId: string; me:
   const [order, setOrder] = useState<OrderSummary | null>(null);
   const [busy, setBusy] = useState(false);
   const [pickup, setPickup] = useState<PickupDetails | null>(null);
+  const [offered, setOffered] = useState<Meal | null>(null);
+  const [viewer, setViewer] = useState<number | null>(null);
 
   const load = useCallback(() => {
     fetchOrder(orderId).then(setOrder).catch(() => {});
@@ -64,6 +71,15 @@ export function OrderActions({ orderId, me, refreshKey }: { orderId: string; me:
       .then(setPickup)
       .catch(() => setPickup(null));
   }, [revealed, shared, orderId]);
+
+  // Échange : le plat proposé (souvent une simple photo, visible seulement par ce Cooker) doit être vu avant de répondre.
+  const offeredId = order?.kind === 'swap' ? order.offeredMealId : undefined;
+  useEffect(() => {
+    if (!offeredId) return setOffered(null);
+    fetchMeal(offeredId)
+      .then(setOffered)
+      .catch(() => setOffered(null));
+  }, [offeredId]);
 
   if (!order) return null;
   const isCooker = me === order.cookerId;
@@ -115,6 +131,24 @@ export function OrderActions({ orderId, me, refreshKey }: { orderId: string; me:
           {order.kind === 'swap' ? t('Échange') : t('Commande')} · {STATUS_LABEL[order.status] ? t(STATUS_LABEL[order.status]) : order.status}
         </Text>
       </View>
+      {offered && (
+        <View style={styles.offer}>
+          <Pressable onPress={() => offered.photos.length && setViewer(0)} accessibilityRole="imagebutton" accessibilityLabel={t('Agrandir la photo')}>
+            <Image source={{ uri: offered.photos[0] }} style={styles.offerThumb} contentFit="cover" />
+          </Pressable>
+          <Pressable style={{ flex: 1, gap: 2 }} onPress={() => router.push({ pathname: '/meal/[id]', params: { id: offered.id } })} accessibilityRole="button">
+            <Text style={styles.pickupSub}>{isCooker ? t('Plat proposé en échange') : t('Votre proposition')}</Text>
+            <Text style={styles.pickupTitle} numberOfLines={1}>
+              {offered.title}
+            </Text>
+            <Text style={styles.pickupSub} numberOfLines={1}>
+              {offered.allergens.length ? t('Contient : {list}', { list: offered.allergens.map((a) => tr(allergenById(a))).join(', ') }) : t('Aucun allergène déclaré')}
+            </Text>
+          </Pressable>
+          <Ionicons name="chevron-forward" size={18} color={colors.muted} />
+          <PhotoViewer photos={offered.photos} index={viewer} onClose={() => setViewer(null)} />
+        </View>
+      )}
       {pickup && (!isCooker || shared) && (
         <Pressable onPress={() => openDirections(pickup)} style={styles.pickup} accessibilityRole="button" accessibilityLabel={t('Itinéraire')}>
           <Ionicons name="location" size={18} color={colors.tomato} />
@@ -163,6 +197,8 @@ function openDirections(p: PickupDetails) {
 }
 
 const styles = createStyles(() => ({
+  offer: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.sm },
+  offerThumb: { width: 56, height: 56, borderRadius: radius.sm, backgroundColor: colors.surfaceAlt },
   pickup: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md },
   pickupTitle: { fontFamily: fonts.semibold, fontSize: 14, color: colors.ink },
   pickupSub: { fontFamily: fonts.regular, fontSize: 12, color: colors.inkSoft },

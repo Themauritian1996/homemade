@@ -14,7 +14,8 @@ import { colors, createStyles, fonts, radius, spacing, type } from '@/theme';
 import type { Conversation, Message } from '@/types';
 
 import { locale, t } from '@/i18n';
-const QUICK_REPLIES = ['Je suis en route 🚶', 'Je suis arrivé·e !', 'Merci, c’était délicieux 🙏'];
+import { KEYBOARD_BEHAVIOR } from '@/lib/useKeyboardAutoScroll';
+const QUICK_REPLIES = ['Je suis en route 🚶‍♀️🚶‍♂️', 'Je suis arrivé·e !', 'Merci, c’était délicieux 🙏'];
 
 export default function Chat() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -104,7 +105,7 @@ export default function Chat() {
   };
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior={KEYBOARD_BEHAVIOR}>
       <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
         <IconButton icon="chevron-back" onPress={() => router.back()} accessibilityLabel={t('Retour')} />
         <Pressable
