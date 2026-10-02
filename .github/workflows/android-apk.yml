@@ -23,6 +23,7 @@ on:
       - '!scripts/android-e2e.mjs'
       - '!scripts/check-i18n.mjs'
       - '!scripts/vendor-leaflet.mjs'
+      - '!scripts/vendor-maplibre.mjs'
       - '!.github/workflows/supabase-deploy.yml'
       - '!.github/workflows/android-e2e.yml'
 

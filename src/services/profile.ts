@@ -21,14 +21,6 @@ export async function loadHealthProfile(): Promise<HealthProfile | null> {
   return (data as HealthProfile) ?? null;
 }
 
-/** Onboarding Stripe Connect du Cooker : renvoie l'URL de la page Stripe (identité + compte bancaire). */
-export async function startPayoutOnboarding(): Promise<string | null> {
-  if (DEMO_MODE) return null;
-  const { data, error } = await requireSupabase().functions.invoke<{ url: string }>('stripe-connect-onboard', { body: {} });
-  if (error) throw error;
-  return data?.url ?? null;
-}
-
 /** Mon profil public (notes et badges calculés par le serveur uniquement). */
 export async function fetchMyProfile(userId: string): Promise<PublicProfile> {
   if (DEMO_MODE) return demoProfile;

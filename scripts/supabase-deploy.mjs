@@ -440,8 +440,21 @@ async function smoke(imagePath) {
     }
 
     // Retour du formulaire Stripe (page publique) et fonds de carte sans clé (ceux que l'app affiche).
-    const ret = await fetch(`${url}/functions/v1/stripe-return?to=done`).then(async (r) => ({ status: r.status, text: await r.text() })).catch((e) => ({ status: 0, text: String(e) }));
-    step(ret.status === 200 && ret.text.includes('homemade://settings'), 'Page de retour Stripe → app', `HTTP ${ret.status}`);
+    const ret = await fetch(`${url}/functions/v1/stripe-return?to=done`, { redirect: 'manual' })
+      .then((r) => ({ status: r.status, location: r.headers.get('location') ?? '' }))
+      .catch((e) => ({ status: 0, location: String(e) }));
+    step(ret.status === 302 && ret.location === 'homemade://settings?payments=done', 'Retour du formulaire Stripe → redirection vers l’app', `HTTP ${ret.status} → ${ret.location}`);
+    // Carte principale : style vectoriel OpenFreeMap → TileJSON → une tuile vectorielle de Montréal.
+    try {
+      const style = await (await fetch('https://tiles.openfreemap.org/styles/liberty')).json();
+      const src = Object.values(style.sources ?? {}).find((x) => x.type === 'vector' && x.url);
+      const tilejson = await (await fetch(src.url)).json();
+      const vt = await fetch(tilejson.tiles[0].replace('{z}', '14').replace('{x}', '4843').replace('{y}', '5850'));
+      const size = (await vt.arrayBuffer()).byteLength;
+      console.log(`${vt.status === 200 && size > 100 ? '✓' : '⚠'} Carte vectorielle OpenFreeMap : style « ${style.name ?? 'liberty'} », tuile HTTP ${vt.status} · ${size} octets`);
+    } catch (e) {
+      console.log(`⚠ Carte vectorielle OpenFreeMap injoignable (l'app utilisera le repli OpenStreetMap) : ${e.message}`);
+    }
     for (const [label, tile] of [
       ['OpenStreetMap', 'https://tile.openstreetmap.org/14/4843/5850.png'],
       ['Esri (secours)', 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/14/5850/4843'],
