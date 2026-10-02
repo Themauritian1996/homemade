@@ -1,0 +1,9 @@
+✓ APK installée
+✓ Écran d’accueil affiché
+✓ Courriel et mot de passe saisis
+✓ Connexion réussie → écran de bienvenue
+✓ Fil « Découvrir » affiché
+✓ Carte interactive chargée (Leaflet + fond OpenStreetMap)
+✓ Écran « Publier » affiché
+✓ Passage en anglais
+✓ Aucun plantage de l’app
