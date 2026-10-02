@@ -11,6 +11,7 @@ import { requireSupabase } from '@/lib/supabase';
 import { SessionUser, useApp } from '@/store/app';
 import { DEMO_USER_ID } from '@/data/mock';
 import type { HealthProfile } from '@/types';
+import { stopPushNotifications } from '@/lib/notifications';
 
 const toSessionUser = (u: { id: string; email?: string; user_metadata?: Record<string, unknown> }): SessionUser => ({
   id: u.id,
@@ -104,6 +105,8 @@ export async function sendPasswordReset(email: string) {
 }
 
 export async function signOut() {
+  // Avant de fermer la session : ce téléphone cesse de recevoir les notifications du compte.
+  await stopPushNotifications();
   if (!DEMO_MODE)
     await requireSupabase()
       .auth.signOut()

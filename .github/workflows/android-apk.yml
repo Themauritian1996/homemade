@@ -104,6 +104,29 @@ jobs:
             console.log('Version de test n°' + n);
           "
 
+      # Notifications push (Firebase) : le fichier google-services.json vient du secret GOOGLE_SERVICES_JSON.
+      # Sans lui, l'APK fonctionne normalement avec les notifications app ouverte seulement.
+      - name: Notifications push (Firebase)
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -z "$GOOGLE_SERVICES_JSON" ]; then
+            echo "Pas de secret GOOGLE_SERVICES_JSON : notifications quand l'app est ouverte seulement."
+            exit 0
+          fi
+          printf '%s' "$GOOGLE_SERVICES_JSON" > google-services.json
+          node -e "
+            const fs = require('fs');
+            const g = JSON.parse(fs.readFileSync('google-services.json', 'utf8'));
+            const app = JSON.parse(fs.readFileSync('app.json', 'utf8'));
+            const pkg = app.expo.android.package;
+            const ok = (g.client ?? []).some((c) => c.client_info?.android_client_info?.package_name === pkg);
+            if (!ok) { console.error('::error::google-services.json ne contient pas l’app Android ' + pkg + ' : ajoute-la dans Firebase (voir le guide).'); process.exit(1); }
+            app.expo.android.googleServicesFile = './google-services.json';
+            fs.writeFileSync('app.json', JSON.stringify(app, null, 2));
+            console.log('Firebase : projet ' + g.project_info?.project_id + ' · notifications push activées dans l’APK');
+          "
+
       - name: Génération du projet Android natif
         run: npx expo prebuild --platform android --no-install --clean
 

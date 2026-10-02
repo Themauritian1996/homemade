@@ -207,7 +207,7 @@ export default function SettingsScreen() {
             <SwitchRow label={t('Nouveaux plats près de chez moi')} value={settings.notifyNewNearby} onChange={(v) => updateSettings({ notifyNewNearby: v })} />
           </Card>
           <Text style={type.caption}>
-            {t('Pendant la bêta, les notifications arrivent quand l’app est ouverte ou en arrière-plan récent. Les alertes avec l’app complètement fermée arrivent bientôt.')}
+            {t('Vous êtes prévenu·e des nouveaux messages et de chaque étape de vos échanges (demande, acceptation, remise).')}
           </Text>
         </Section>
 

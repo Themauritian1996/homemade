@@ -39,3 +39,7 @@ verify_jwt = false
 # Page de retour du formulaire Stripe (ouverte par le navigateur, sans JWT) : renvoie vers l'app.
 [functions.stripe-return]
 verify_jwt = false
+
+# Notifications push : appelée par la base (pg_net) avec un secret partagé, pas par un utilisateur.
+[functions.push-notify]
+verify_jwt = false

@@ -393,6 +393,27 @@ check('voisins favoris : ajout et page du voisin', fav1 === true && favs.length 
 const [{ t: fav2 }] = await q(`select public.toggle_favorite_person($1) as t`, [eater.id]);
 check('voisins favoris : retrait', fav2 === false);
 
+// 11d) Notifications push : jetons par RPC, envoi jamais bloquant (même sans pg_net ni Firebase)
+await as(eater.id);
+const tokE = 'fcm-eater-' + 'x'.repeat(40);
+await q(`select public.register_push_token($1, 'android')`, [tokE]);
+await expectError('jeton push : plateforme invalide refusée', () => q(`select public.register_push_token($1, 'windows')`, [tokE]), /INVALID_INPUT/);
+await as(cook.id);
+await q(`select public.register_push_token($1, 'android')`, ['fcm-cook-' + 'y'.repeat(40)]);
+const tokRows = await q(`select user_id from public.push_tokens order by user_id`);
+check('jetons push enregistrés (un par appareil)', tokRows.length === 2);
+await q(`insert into public.push_config (endpoint, secret) values ('http://127.0.0.1:9/push-notify', $1)`, ['s'.repeat(40)]);
+const [{ id: pushConv }] = await q(`select conversation_id as id from public.conversation_participants where user_id = $1 limit 1`, [eater.id]);
+await q(`insert into public.conversation_participants (conversation_id, user_id) values ($1, $2) on conflict do nothing`, [pushConv, cook.id]);
+await q(`insert into public.messages (conversation_id, sender_id, body) values ($1, $2, 'Test push')`, [pushConv, cook.id]);
+check('message enregistré même si l’envoi push échoue (fail-safe)', (await q(`select 1 from public.messages where body = 'Test push'`)).length === 1);
+// Même téléphone, autre compte connecté : le jeton change de propriétaire.
+await q(`select public.register_push_token($1, 'android')`, [tokE]);
+check('jeton push : passe au dernier compte connecté', (await q(`select user_id from public.push_tokens where token = $1`, [tokE]))[0].user_id === cook.id);
+await q(`select public.unregister_push_token($1)`, [tokE]);
+check('jeton push : retiré à la déconnexion', (await q(`select 1 from public.push_tokens where token = $1`, [tokE])).length === 0);
+await q(`delete from public.push_config`);
+
 // 12) Invitations désactivables par l'équipe
 await q(`update public.app_config set value = 'false' where key = 'invite_required'`);
 const [open] = await signup('libre@test.ca');
@@ -404,6 +425,8 @@ await expectError('colonne pickup_point illisible pour authenticated', () => q(`
 await expectError('meal_is_safe_for non exécutable par authenticated', () => q(`select public.meal_is_safe_for($1, $2)`, [meal2, allergic.id]), /permission denied/);
 await expectError('adresse privée illisible directement', () => q(`select address_line from public.user_private limit 1`), /permission denied/);
 await expectError('insertion directe dans meals interdite', () => q(`insert into public.meals (cooker_id) values ($1)`, [eater.id]), /permission denied/);
+await expectError('jetons push illisibles directement', () => q(`select token from public.push_tokens`), /permission denied/);
+await expectError('configuration push illisible', () => q(`select secret from public.push_config`), /permission denied/);
 const visible = await q(`select id from public.meals`);
 check('RLS : lecture des plats visibles fonctionne', visible.length >= 1, `${visible.length} plats`);
 await db.exec(`reset role`);
