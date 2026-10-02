@@ -1,3 +1,4 @@
+import { formatPortion } from '@/data/portions';
 import { getLang, locale, t } from '@/i18n';
 
 /** Séparateur décimal de la langue : virgule en français, point en anglais. */
@@ -9,6 +10,10 @@ export const formatPrice = (cents: number | null | undefined) =>
 /** Prix compact pour la carte : « 5 $ » (sans décimales quand le prix est rond), « 4,50 $ » sinon. */
 export const formatPriceShort = (cents: number) =>
   new Intl.NumberFormat(locale(), { style: 'currency', currency: 'CAD', minimumFractionDigits: cents % 100 ? 2 : 0, maximumFractionDigits: 2 }).format(cents / 100);
+
+/** Prix et ce qu'il achète : « 5,00 $ / assiette », « 4,50 $ / 500 ml » ; « Échange » sans prix. */
+export const formatPricePer = (cents: number | null | undefined, qty?: number | null, unit?: string | null) =>
+  cents == null ? t('Échange') : `${formatPrice(cents)} / ${formatPortion(qty, unit)}`;
 
 export const formatDistance = (km?: number) => (km == null ? '' : km < 1 ? `${Math.round(km * 1000)} m` : `${decimal(km.toFixed(1))} km`);
 

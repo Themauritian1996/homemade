@@ -4,7 +4,7 @@
  */
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Alert, ScrollView, Text, TextInput, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, Chip, IconButton, Stars } from '@/components/ui';
 import { friendlyError } from '@/lib/errors';
@@ -14,9 +14,11 @@ import { useApp } from '@/store/app';
 import { colors, fonts, radius, spacing, type } from '@/theme';
 
 import { t } from '@/i18n';
+import { KEYBOARD_BEHAVIOR, useKeyboardAutoScroll } from '@/lib/useKeyboardAutoScroll';
 export default function ReviewModal() {
   const { orderId } = useLocalSearchParams<{ orderId: string }>();
   const insets = useSafeAreaInsets();
+  const kb = useKeyboardAutoScroll();
   const [rating, setRating] = useState(0);
   const [sub, setSub] = useState<Record<string, number>>({});
   const [tags, setTags] = useState<string[]>([]);
@@ -51,12 +53,12 @@ export default function ReviewModal() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior={KEYBOARD_BEHAVIOR}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.xl, paddingTop: insets.top + spacing.md }}>
         <Text style={type.h2}>{t('Comment c\'était ?')}</Text>
         <IconButton icon="close" onPress={() => router.back()} accessibilityLabel={t('Fermer')} />
       </View>
-      <ScrollView contentContainerStyle={{ padding: spacing.xl, gap: spacing.xxl, paddingBottom: 140 }}>
+      <ScrollView {...kb} style={{ flex: 1 }} contentContainerStyle={{ padding: spacing.xl, gap: spacing.xxl, paddingBottom: spacing.xl }}>
         <View style={{ alignItems: 'center', gap: spacing.md }}>
           <Text style={type.body}>{t('Votre note globale')}</Text>
           <Stars value={rating} size={40} onChange={setRating} />
@@ -85,9 +87,9 @@ export default function ReviewModal() {
         />
         <Text style={type.caption}>{t('Un problème d\'hygiène ou d\'allergène ? Signalez-le depuis l\'aide : notre équipe le traite en priorité.')}</Text>
       </ScrollView>
-      <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: spacing.xl, paddingBottom: insets.bottom + spacing.md, backgroundColor: colors.bg }}>
+      <View style={{ padding: spacing.xl, paddingTop: spacing.md, paddingBottom: insets.bottom + spacing.md, backgroundColor: colors.bg }}>
         <Button title={t('Publier mon avis')} onPress={submit} loading={loading} />
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }

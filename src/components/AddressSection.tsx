@@ -11,6 +11,7 @@ import { friendlyError } from '@/lib/errors';
 import { geocode, getMyAddress, normalizePostalCode, saveMyAddress } from '@/services/address';
 import { colors, createStyles, radius, spacing, type } from '@/theme';
 import type { GeoPoint } from '@/types';
+import { AddressAutocomplete } from './AddressAutocomplete';
 import { PickupPicker } from './PickupPicker';
 import { Button, TextField } from './ui';
 
@@ -77,12 +78,23 @@ export function AddressSection() {
       <View style={styles.privacy}>
         <Ionicons name="lock-closed" size={16} color={colors.forest} />
         <Text style={[type.caption, { flex: 1, color: colors.forest }]}>
-          {t('Privée. Publiquement : votre zone postale ({zone}) et un point approximatif. L’adresse est donnée à l’acheteur seulement après votre acceptation (et son paiement).', {
+          {t('Privée. Publiquement : votre zone postale ({zone}) et un point approximatif. Après acceptation d’un échange, vous choisissez de partager votre adresse ou de proposer un point de rencontre.', {
             zone: savedZone ?? 'H2J',
           })}
         </Text>
       </View>
-      <TextField label={t('Adresse')} value={address} onChangeText={setAddress} placeholder={t('Ex. 1234 rue Rachel Est, app. 2')} icon="home-outline" maxLength={200} />
+      <AddressAutocomplete
+        value={address}
+        onChangeText={setAddress}
+        placeholder={t('Ex. 1234 rue Rachel Est, app. 2')}
+        onPick={(s) => {
+          setAddress(s.street ?? s.label);
+          if (s.postalCode && normalizePostalCode(s.postalCode)) setPostal(normalizePostalCode(s.postalCode)!);
+          setGps(false);
+          setPoint({ latitude: s.latitude, longitude: s.longitude });
+          setMapKey((k) => k + 1);
+        }}
+      />
       <TextField
         label={t('Code postal')}
         value={postal}
@@ -101,6 +113,7 @@ export function AddressSection() {
           onChange={setPoint}
           onConfirmed={() => {}}
           hideArea
+          searchable={false}
           autoLocate={gps}
         />
       )}

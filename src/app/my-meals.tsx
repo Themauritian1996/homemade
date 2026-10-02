@@ -6,11 +6,12 @@ import { Alert, FlatList, Pressable, RefreshControl, Text, View } from 'react-na
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Badge, Button, EmptyState, ScreenHeader } from '@/components/ui';
 import { friendlyError } from '@/lib/errors';
-import { formatPrice, timeLeft } from '@/lib/format';
+import { formatPricePer, timeLeft } from '@/lib/format';
 import { fetchMyMeals, MyMeal, withdrawMeal } from '@/services/account';
 import { colors, createStyles, radius, shadow, spacing, type } from '@/theme';
 
 import { t } from '@/i18n';
+import { PhotoViewer } from '@/components/PhotoViewer';
 const STATUS: Record<string, { label: string; tone: 'forest' | 'saffron' | 'danger' | 'neutral' }> = {
   published: { label: 'En ligne', tone: 'forest' },
   reserved: { label: 'Réservé', tone: 'saffron' },
@@ -23,6 +24,7 @@ const STATUS: Record<string, { label: string; tone: 'forest' | 'saffron' | 'dang
 export default function MyMeals() {
   const insets = useSafeAreaInsets();
   const [meals, setMeals] = useState<MyMeal[]>([]);
+  const [viewer, setViewer] = useState<{ photos: string[]; index: number } | null>(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(() => {
@@ -58,6 +60,7 @@ export default function MyMeals() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <ScreenHeader title={t('Mes plats')} subtitle={t('Vos annonces des 50 derniers plats')} />
+      <PhotoViewer photos={viewer?.photos ?? []} index={viewer ? viewer.index : null} onClose={() => setViewer(null)} />
       <FlatList
         data={meals}
         keyExtractor={(m) => m.id}
@@ -80,7 +83,9 @@ export default function MyMeals() {
           return (
             <View style={styles.card}>
               <Pressable onPress={() => router.push({ pathname: '/meal/[id]', params: { id: m.id } })} style={styles.row} accessibilityRole="button">
-                <Image source={{ uri: m.photos[0] }} style={styles.thumb} contentFit="cover" />
+                <Pressable onPress={() => m.photos.length && setViewer({ photos: m.photos, index: 0 })} accessibilityRole="imagebutton" accessibilityLabel={t('Agrandir la photo')}>
+                  <Image source={{ uri: m.photos[0] }} style={styles.thumb} contentFit="cover" />
+                </Pressable>
                 <View style={{ flex: 1, gap: 4 }}>
                   <Text style={type.h3} numberOfLines={1}>
                     {m.title}
@@ -90,7 +95,7 @@ export default function MyMeals() {
                     {m.activeOrders > 0 && <Badge label={t('{0} demande(s)', { 0: m.activeOrders })} tone="tomato" icon="chatbubbles-outline" />}
                   </View>
                   <Text style={type.caption}>
-                    {formatPrice(m.priceCents)} · {m.portionsLeft}/{m.portionsTotal}{' '}{t('portions')}{live ? t(' · encore {0}', { 0: timeLeft(m.availableUntil) }) : ''}
+                    {formatPricePer(m.priceCents, m.portionQty, m.portionUnit)} · {m.portionsLeft}/{m.portionsTotal}{' '}{t('portions')}{live ? t(' · encore {0}', { 0: timeLeft(m.availableUntil) }) : ''}
                   </Text>
                 </View>
               </Pressable>

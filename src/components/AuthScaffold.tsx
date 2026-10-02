@@ -6,12 +6,15 @@ import { t } from '@/i18n';
 import { colors, spacing, type } from '@/theme';
 import { LanguageToggle } from './LanguageToggle';
 import { IconButton, Logo } from './ui';
+import { KEYBOARD_BEHAVIOR, useKeyboardAutoScroll } from '@/lib/useKeyboardAutoScroll';
 
 export function AuthScaffold({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
   const insets = useSafeAreaInsets();
+  const kb = useKeyboardAutoScroll();
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior={KEYBOARD_BEHAVIOR}>
       <ScrollView
+        {...kb}
         contentContainerStyle={{ paddingTop: insets.top + spacing.md, paddingBottom: insets.bottom + spacing.xl, paddingHorizontal: spacing.xxl, flexGrow: 1 }}
         keyboardShouldPersistTaps="handled"
       >

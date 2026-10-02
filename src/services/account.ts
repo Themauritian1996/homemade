@@ -60,19 +60,21 @@ export interface Settings {
   defaultRadiusKm: number;
   notifyMessages: boolean;
   notifyNewNearby: boolean;
+  /** Afficher le texte des messages dans les notifications (sinon « Nouveau message »). */
+  notifyPreview: boolean;
 }
 
 export async function loadAccount(userId: string): Promise<{ profile: EditableProfile; settings: Settings }> {
   if (DEMO_MODE) {
     return {
       profile: { displayName: '', neighborhood: 'Plateau-Mont-Royal', bio: '' },
-      settings: { defaultRadiusKm: 5, notifyMessages: true, notifyNewNearby: true },
+      settings: { defaultRadiusKm: 5, notifyMessages: true, notifyNewNearby: true, notifyPreview: false },
     };
   }
   const sb = requireSupabase();
   const [p, s] = await Promise.all([
     sb.from('profiles').select('display_name, neighborhood, bio, avatar_url').eq('id', userId).single(),
-    sb.from('user_settings').select('default_radius_m, notify_messages, notify_new_nearby').eq('user_id', userId).single(),
+    sb.from('user_settings').select('default_radius_m, notify_messages, notify_new_nearby, notify_preview').eq('user_id', userId).single(),
   ]);
   if (p.error) throw p.error;
   if (s.error) throw s.error;
@@ -82,6 +84,7 @@ export async function loadAccount(userId: string): Promise<{ profile: EditablePr
       defaultRadiusKm: Math.round(s.data.default_radius_m / 1000),
       notifyMessages: s.data.notify_messages,
       notifyNewNearby: s.data.notify_new_nearby,
+      notifyPreview: Boolean(s.data.notify_preview),
     },
   };
 }
@@ -103,7 +106,7 @@ export async function saveSettings(userId: string, s: Settings) {
   if (DEMO_MODE) return;
   const { error } = await requireSupabase()
     .from('user_settings')
-    .update({ default_radius_m: Math.round(s.defaultRadiusKm * 1000), notify_messages: s.notifyMessages, notify_new_nearby: s.notifyNewNearby })
+    .update({ default_radius_m: Math.round(s.defaultRadiusKm * 1000), notify_messages: s.notifyMessages, notify_new_nearby: s.notifyNewNearby, notify_preview: s.notifyPreview })
     .eq('user_id', userId);
   if (error) throw error;
 }

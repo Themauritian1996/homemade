@@ -27,7 +27,8 @@ Le document à relire avant chaque décision produit ou technique. Si une demand
 | Prix par portion | 2 $ – 50 $ CA | contrainte `meals.price_cents` |
 | Prix suggéré au Cooker | 5 $ / portion (choix rapides 4, 5, 6, 8 $) | `SUGGESTED_PRICE`, `QUICK_PRICES` (publish.tsx) |
 | Portions par annonce | 1 – 20 | contrainte `meals.portions_total` |
-| Fenêtre de disponibilité | 2 – 72 h | `publish_meal`, contrainte `meals_window_valid` |
+| Fenêtre de disponibilité | 2 – 72 h ; choix rapides 2, 4, 6, 12 h, 1, 2, 3 j ou saisie libre en heures | `publish_meal`, contrainte `meals_window_valid`, `DurationPicker` (publish.tsx) |
+| Contenu d'une portion | Quantité (0,01 – 10 000) + unité : assiette, bol, boîte, pièce, part, pot, ml, l, g, kg (défaut : 1 assiette) ; prix affiché « 5 $ / 500 ml » | `meals.portion_qty`, `meals.portion_unit`, `publish_meal_with_details`, `src/data/portions.ts` |
 | Rayon de recherche | 1 – 25 km (défaut 5) | filtres, `feed_meals` (max 50 km serveur) |
 | Brouillage de position | 100 – 300 m | `publish_meal` |
 | Expiration commande non payée | 30 min (achat) / 24 h (échange) | `cancel_stale_orders` |
@@ -45,6 +46,7 @@ Le document à relire avant chaque décision produit ou technique. Si une demand
 | Invitations par membre | 5 | `my_invite_code` |
 | Carte | MapLibre GL 5 embarqué + fond vectoriel OpenFreeMap « Liberty » (gratuit, sans clé, rendu façon Google Maps) ; repli automatique : Leaflet + OpenStreetMap, puis Esri — CARTO exige désormais une clé | `src/lib/mapHtml.ts`, `src/lib/maplibreInline.ts`, `src/lib/leafletInline.ts` |
 | Adresse du Cooker | Privée (`user_private`, illisible directement) ; publiquement : zone postale (3 caractères, ex. H2J) + point décalé ; après acceptation, le Cooker la **partage d'un bouton** (sinon point de rencontre convenu dans le chat) | `set_my_address`, `meals_public_zone`, `share_pickup_address`, `get_pickup_details` |
+| Suggestions d'adresse | Pendant la frappe, Canada seulement, gratuites et sans clé (Photon / OpenStreetMap ; Google Places exigerait une clé payante) | `suggestAddresses` (`src/services/address.ts`), `AddressAutocomplete` |
 | Anti-contournement | Téléphones, courriels, liens et paiements hors app masqués dans le chat (serveur) ; motif de signalement « off_platform » | `mask_off_platform` |
 | Paiements | Stripe Connect Express (mode test d'abord) ; webhooks créés par le robot de déploiement | secrets `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY` |
 | Plat « en cours » | Dernières portions réservées par une commande pas encore remise : reste visible (grisé, en fin de liste) ; disparaît à la remise, revient si annulé | `meal_has_active_order`, `feed_meals` |
@@ -53,7 +55,7 @@ Le document à relire avant chaque décision produit ou technique. Si une demand
 | Critères d'avis | Cooker : goût, hygiène, conformité, ponctualité · Eater : venu à l'heure, communication, respect, fiabilité | `src/data/reviewCriteria.ts`, `review_summary` |
 | Conversations terminées | Supprimables (balayage) ; masquées automatiquement 48 h après la fin ; effacées du serveur après 30 jours | `hide_conversation`, `my_conversations`, `purge_old_conversations` (pg_cron) |
 | Apparence | Automatique (suit le téléphone) · clair · sombre ; carte OpenFreeMap « dark » | `applyScheme`, `createStyles` (`src/theme`), `themeMode` |
-| Notifications | Messages et étapes de commande. Avec Firebase : push FCM même app fermée (jeton par appareil, envoi par la base via pg_net → `push-notify`, jamais bloquant) ; sans Firebase : locales (app ouverte) | `src/lib/notifications.ts`, `push_tokens`, `push-notify`, secrets `GOOGLE_SERVICES_JSON`, `FIREBASE_SERVICE_ACCOUNT`, préférence `notify_messages` |
+| Notifications | Messages et étapes de commande ; texte du message affiché seulement si la personne l'active (défaut : « Nouveau message de Camille », confidentialité par défaut) ; rédigées dans la langue du compte. Avec Firebase : push FCM même app fermée (jeton par appareil, envoi par la base via pg_net → `push-notify`, jamais bloquant) ; sans Firebase : locales (app ouverte) | `src/lib/notifications.ts`, `push_tokens`, `push-notify`, secrets `GOOGLE_SERVICES_JSON`, `FIREBASE_SERVICE_ACCOUNT`, préférences `notify_messages`, `notify_preview` |
 | Objectif rappel allergènes IA | ≥ 98 % | jeu d'évaluation (docs/03) |
 | Objectif latence analyse | p95 < 8 s | idem |
 

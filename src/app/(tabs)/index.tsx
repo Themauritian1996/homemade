@@ -4,6 +4,7 @@ import React, { useMemo, useState } from 'react';
 import * as Location from 'expo-location';
 import { FlatList, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ActiveExchanges } from '@/components/ActiveExchanges';
 import { FilterSheet } from '@/components/FilterSheet';
 import { MealCard } from '@/components/MealCard';
 import { ZoneSearch } from '@/components/ZoneSearch';
@@ -133,6 +134,8 @@ export default function Discover() {
           />
         ))}
       </ScrollView>
+
+      {!query && <ActiveExchanges />}
 
       {!query && (
         <View style={styles.community}>

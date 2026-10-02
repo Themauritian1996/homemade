@@ -16,6 +16,7 @@ const MESSAGES: [RegExp, string][] = [
   [/rate limit|too many requests|429/i, 'Trop de tentatives. Patientez quelques minutes puis réessayez.'],
   [/Password should be at least/i, 'Le mot de passe doit contenir au moins 8 caractères.'],
   [/HEALTH_PROFILE_CONFLICT/, 'Ce plat n’est pas compatible avec votre profil santé.'],
+  [/INVALID_PORTION/, 'Quantité par portion invalide : choisissez une unité et une quantité entre 1 et 10 000.'],
   [/OFFER_CONFLICTS_WITH_COOKER_HEALTH_PROFILE/, 'Votre plat n’est pas compatible avec le profil santé de ce Cooker. Proposez-en un autre.'],
   [/STRIPE_ONBOARDING_REQUIRED/, 'La vente n’est pas encore activée pour votre compte. Choisissez le mode Échange.'],
   [/DIET_CONFLICT/, 'Un régime coché est incompatible avec les allergènes déclarés (ex. « végane » avec du lait).'],

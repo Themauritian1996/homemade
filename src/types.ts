@@ -1,5 +1,6 @@
 /** Types de domaine — miroir du schéma Postgres (`supabase/migrations`). */
 import type { AllergenCode, CuisineCode, DietCode } from '@/data/allergens';
+import type { PortionUnit } from '@/data/portions';
 
 export type MealMode = 'sale' | 'swap' | 'both';
 export type MealStatus = 'draft' | 'published' | 'reserved' | 'sold_out' | 'expired' | 'archived';
@@ -51,6 +52,9 @@ export interface Meal {
   currency: 'CAD';
   portionsTotal: number;
   portionsLeft: number;
+  /** Ce que contient une portion (le prix est par portion) : 1 assiette, 500 ml, 10 pièces… */
+  portionQty?: number;
+  portionUnit?: PortionUnit;
   preparedAt: string;
   availableUntil: string;
   pickupLocation: GeoPoint;

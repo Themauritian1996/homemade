@@ -5,7 +5,7 @@ import { router } from 'expo-router';
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { cuisineById } from '@/data/allergens';
-import { formatDistance, formatPrice, relativeTime, timeLeft } from '@/lib/format';
+import { formatDistance, formatPricePer, relativeTime, timeLeft } from '@/lib/format';
 import { photoFreshness } from '@/lib/photoFreshness';
 import { colors, createStyles, fonts, radius, shadow, spacing, type } from '@/theme';
 import type { Meal } from '@/types';
@@ -32,7 +32,7 @@ export function MealCard({ meal, variant = 'full' }: { meal: Meal; variant?: 'fu
             {posted ? ` · ${posted}` : ''}
           </Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-            <Text style={[type.price, { fontSize: 15 }]}>{formatPrice(meal.priceCents)}</Text>
+            <Text style={[type.price, { fontSize: 15, flexShrink: 1 }]} numberOfLines={1}>{formatPricePer(meal.priceCents, meal.portionQty, meal.portionUnit)}</Text>
             {meal.pending ? <PendingBadge /> : <RatingPill rating={meal.cooker.cookerRating} count={meal.cooker.cookerRatingCount} compact />}
           </View>
         </View>
@@ -60,7 +60,7 @@ export function MealCard({ meal, variant = 'full' }: { meal: Meal; variant?: 'fu
         </View>
         <View style={styles.bottomRow}>
           <View style={styles.pricePill}>
-            <Text style={styles.priceText}>{formatPrice(meal.priceCents)}</Text>
+            <Text style={styles.priceText}>{formatPricePer(meal.priceCents, meal.portionQty, meal.portionUnit)}</Text>
           </View>
           {meal.pending ? (
             <PendingBadge />

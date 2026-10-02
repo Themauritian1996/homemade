@@ -8,7 +8,8 @@ import { isMealSafe } from '@/lib/safety';
 import { requireSupabase } from '@/lib/supabase';
 import { meals as demoMeals, reviewsByCooker } from '@/data/mock';
 import type { AllergenCode, CuisineCode, DietCode } from '@/data/allergens';
-import type { FeedFilters, GeoPoint, HealthProfile, Meal, MealIngredient, MealMode, Review } from '@/types';
+import type { FeedFilters, GeoPoint, HealthProfile, Meal, MealIngredient, MealMode, Review } from '@/types';
+import type { PortionUnit } from '@/data/portions';
 
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -104,11 +105,18 @@ export interface PublishMealInput {
   pickupArea: string;
   /** Case « J'ai vérifié la liste des ingrédients et des allergènes » — obligatoire. */
   cookerAttestation: boolean;
+  /** Ce que contient une portion (défaut : 1 assiette). */
+  portionQty?: number;
+  portionUnit?: PortionUnit;
+  /** Origine de la photo (indice de fraîcheur). */
+  photoSource?: 'camera' | 'library';
+  photoTakenAt?: string | null;
 }
 
 /**
- * Publication atomique via RPC `publish_meal` : insère le plat, ses ingrédients, recalcule
- * `meal_allergens` et passe le statut à `published` seulement si l'attestation est présente.
+ * Publication atomique via RPC `publish_meal_with_details` (= `publish_meal` + portion + origine de la photo, une
+ * seule transaction) : insère le plat, ses ingrédients, recalcule `meal_allergens` et passe le statut à `published`
+ * seulement si l'attestation est présente.
  */
 export async function publishMeal(input: PublishMealInput): Promise<{ id: string }> {
   if (!input.cookerAttestation) throw new Error('La validation des allergènes par le Cooker est obligatoire.');
@@ -116,7 +124,7 @@ export async function publishMeal(input: PublishMealInput): Promise<{ id: string
     await delay(700);
     return { id: `demo-${Date.now()}` };
   }
-  const { data, error } = await requireSupabase().rpc('publish_meal', { p_payload: input });
+  const { data, error } = await requireSupabase().rpc('publish_meal_with_details', { p_payload: input });
   if (error) throw error;
   return { id: data as string };
 }

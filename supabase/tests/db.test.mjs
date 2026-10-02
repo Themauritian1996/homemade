@@ -414,6 +414,40 @@ await q(`select public.unregister_push_token($1)`, [tokE]);
 check('jeton push : retiré à la déconnexion', (await q(`select 1 from public.push_tokens where token = $1`, [tokE])).length === 0);
 await q(`delete from public.push_config`);
 
+// 11e) Portion : quantité + unité enregistrées avec le plat, en une transaction ; valeurs invalides refusées
+await as(cook.id);
+const [{ id: mealMl }] = await q(`select public.publish_meal_with_details($1::jsonb) as id`, [
+  JSON.stringify({ ...basePayload, title: 'Soupe repas', cuisine: 'other', mode: 'sale', diets: [], declaredAllergens: [], portionQty: 500, portionUnit: 'ml',
+    photoSource: 'camera', ingredients: [{ name: 'Carottes', allergens: [], source: 'cooker' }] }),
+]);
+const [{ m: mlJson }] = await q(`select public.meal_to_json($1) as m`, [mealMl]);
+check('portion : 500 ml enregistrés et renvoyés', Number(mlJson.portionQty) === 500 && mlJson.portionUnit === 'ml' && mlJson.photoSource === 'camera', `${mlJson.portionQty} ${mlJson.portionUnit}`);
+const beforeBad = (await q(`select count(*)::int as n from public.meals`))[0].n;
+await expectError('portion : unité inconnue refusée', () => q(`select public.publish_meal_with_details($1::jsonb)`, [
+  JSON.stringify({ ...basePayload, title: 'Mauvaise unité', cuisine: 'other', mode: 'sale', diets: [], declaredAllergens: [], portionQty: 1, portionUnit: 'barrel',
+    ingredients: [{ name: 'Riz', allergens: [], source: 'cooker' }] }),
+]), /INVALID_PORTION/);
+await expectError('portion : quantité nulle refusée', () => q(`select public.publish_meal_with_details($1::jsonb)`, [
+  JSON.stringify({ ...basePayload, title: 'Zéro', cuisine: 'other', mode: 'sale', diets: [], declaredAllergens: [], portionQty: 0, portionUnit: 'g',
+    ingredients: [{ name: 'Riz', allergens: [], source: 'cooker' }] }),
+]), /INVALID_PORTION/);
+await expectError('portion : quantité arrondie à zéro refusée proprement', () => q(`select public.publish_meal_with_details($1::jsonb)`, [
+  JSON.stringify({ ...basePayload, title: 'Minuscule', cuisine: 'other', mode: 'sale', diets: [], declaredAllergens: [], portionQty: 0.001, portionUnit: 'kg',
+    ingredients: [{ name: 'Riz', allergens: [], source: 'cooker' }] }),
+]), /INVALID_PORTION/);
+check('portion invalide : aucun plat créé', (await q(`select count(*)::int as n from public.meals`))[0].n === beforeBad);
+const [{ m: defJson }] = await q(`select public.meal_to_json($1) as m`, [meal1]);
+check('portion par défaut : 1 assiette', Number(defJson.portionQty) === 1 && defJson.portionUnit === 'plate');
+
+// 11f) Accueil : mes échanges en cours (rôle, ce qui attend ma réponse en premier)
+for (const who of [cook, eater]) {
+  await as(who.id);
+  const [{ x: active }] = await q(`select public.my_active_exchanges() as x`);
+  const [{ n }] = await q(`select count(*)::int as n from public.orders where $1 in (cooker_id, eater_id) and status in ('requested','paid','accepted','ready')`, [who.id]);
+  const sorted = active.every((e, i) => i === 0 || !(e.needsMe && !active[i - 1].needsMe));
+  check(`accueil : échanges en cours de ${who === cook ? 'Cooker' : 'Eater'} (${n})`, active.length === Math.min(n, 20) && active.every((e) => ['cooker', 'eater'].includes(e.role) && e.conversationId) && sorted, JSON.stringify(active.map((e) => [e.status, e.role, e.needsMe])));
+}
+
 // 12) Invitations désactivables par l'équipe
 await q(`update public.app_config set value = 'false' where key = 'invite_required'`);
 const [open] = await signup('libre@test.ca');
